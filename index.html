@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Friction-Slayer — Stop Bleeding Revenue.</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=JetBrains+Mono&display=swap');
+    
+    html, body { height: 100%; overflow: hidden; background: #050505; font-family: 'Inter', sans-serif; }
+    #viewport { position: fixed; inset: 0; }
+    .layer { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+
+    /* Luxury Noise Overlay */
+    body::before {
+      content: ""; position: absolute; inset: 0; z-index: 50; pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+      opacity: 0.03;
+    }
+
+    #layer-landing { transition: opacity .6s ease, transform .6s cubic-bezier(.16, 1, 0.3, 1); }
+    #layer-landing.exit { opacity: 0; transform: scale(0.95); pointer-events: none; }
+
+    .dolphin-wrap { animation: swim 6s ease-in-out infinite; }
+    @keyframes swim {
+      0%, 100% { transform: translateY(0) rotate(-2deg); }
+      50% { transform: translateY(-15px) rotate(2deg); }
+    }
+    .dolphin-glow { filter: drop-shadow(0 0 20px rgba(34,211,238,0.6)); }
+
+    #layer-loading { flex-direction: column; opacity: 0; pointer-events: none; transition: opacity .5s ease; background: #050505; z-index: 100; }
+    #layer-loading.active { opacity: 1; pointer-events: auto; }
+
+    .ld-track { width: 300px; height: 2px; background: rgba(255,255,255,.05); border-radius: 4px; overflow: hidden; position: relative; }
+    .ld-fill {
+      height: 100%; width: 0; background: #22d3ee; box-shadow: 0 0 15px #22d3ee;
+      animation: prog 4.5s cubic-bezier(.4,0,.2,1) forwards;
+    }
+    @keyframes prog { 0% { width: 0%; } 100% { width: 100%; } }
+
+    .ld-step { opacity: 0; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: rgba(255,255,255,0.4); }
+    .ld-step.active { animation: fadeInRight 0.4s ease forwards; }
+    @keyframes fadeInRight { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+  </style>
+</head>
+<body>
+
+<div id="viewport">
+  <div id="layer-landing" class="layer flex-col text-center px-6">
+    <div class="inline-flex items-center gap-2 border border-white/[.08] bg-white/[.02] rounded-full px-4 py-1.5 mb-12">
+      <span class="w-1.5 h-1.5 rounded-full bg-cyan shadow-[0_0_10px_#22d3ee]"></span>
+      <span class="text-[9px] font-bold uppercase tracking-[0.3em] text-white/40">Qaseem.pk — Revenue Intelligence</span>
+    </div>
+
+    <div class="dolphin-wrap mb-8 dolphin-glow">
+      <svg width="80" height="80" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10 58 C18 30, 50 18, 74 28 C86 33, 90 44, 82 52 C72 62, 52 64, 36 68 C24 71, 12 68, 10 58Z" fill="rgba(34,211,238,0.1)" stroke="#22d3ee" stroke-width="1.5"/>
+        <path d="M52 26 C56 14, 68 12, 70 22" stroke="#22d3ee" stroke-width="1.5" fill="none"/>
+        <circle cx="72" cy="36" r="2" fill="#22d3ee"/>
+      </svg>
+    </div>
+
+    <h1 class="text-[clamp(3.5rem,10vw,5.5rem)] font-[900] leading-[0.9] tracking-[-0.05em] mb-6 text-white">
+      Stop<br/>
+      <span class="bg-gradient-to-b from-[#ff4d4d] to-[#7f1d1d] bg-clip-text text-transparent">Bleeding</span><br/>
+      Revenue.
+    </h1>
+
+    <p class="text-white/30 text-[1.1rem] max-w-[400px] mb-12 leading-relaxed">
+      Every friction point is a silent tax on your growth.<br/>
+      Audit your site's <span class="text-white/60 font-bold italic">Revenue Leak</span> in 8 seconds.
+    </p>
+
+    <form id="audit-form" class="w-full max-w-[440px] flex flex-col gap-3">
+      <input id="url-input" type="url" placeholder="https://yourbusiness.com" required
+        class="w-full bg-white/[.03] border border-white/[.1] rounded-xl px-6 py-4 text-white placeholder-white/10 outline-none focus:border-cyan/50 transition-all text-lg" />
+      <button type="submit" class="w-full py-4 rounded-xl bg-cyan text-black font-black uppercase tracking-widest text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_40px_rgba(34,211,238,0.3)]">
+        Calculate Revenue Leak &rarr;
+      </button>
+    </form>
+    
+    <p class="mt-8 text-[9px] uppercase tracking-widest text-white/10">No Credit Card Required • Enterprise Grade Scan</p>
+  </div>
+
+  <div id="layer-loading" class="layer">
+    <div class="flex flex-col items-center gap-8">
+      <div class="text-cyan text-[10px] uppercase tracking-[0.4em] mb-4 animate-pulse">Running Deep Scan...</div>
+      <div class="ld-track"><div class="ld-fill"></div></div>
+      <div id="status-steps" class="flex flex-col gap-3 w-[280px]">
+        <div class="ld-step" data-delay="500">Connecting to PageSpeed API...</div>
+        <div class="ld-step" data-delay="1200">Analyzing Hick's Law Coefficient...</div>
+        <div class="ld-step" data-delay="2000">Calculating Loss Aversion Impact...</div>
+        <div class="ld-step" data-delay="2800">Mapping Decision Tree Friction...</div>
+        <div class="ld-step" data-delay="3600">Generating Executive Dashboard...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const form = document.getElementById('audit-form');
+  const landing = document.getElementById('layer-landing');
+  const loading = document.getElementById('layer-loading');
+  const steps = document.querySelectorAll('.ld-step');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const url = document.getElementById('url-input').value;
+
+    landing.classList.add('exit');
+    setTimeout(() => {
+      landing.style.display = 'none';
+      loading.classList.add('active');
+      
+      steps.forEach((step, i) => {
+        setTimeout(() => step.classList.add('active'), step.dataset.delay);
+      });
+    }, 600);
+
+    const minWait = new Promise(r => setTimeout(r, 4500));
+    
+    try {
+      const response = await Promise.all([
+        fetch('/analyze', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ url })
+        }),
+        minWait
+      ]);
+      const html = await response[0].text();
+      document.open();
+      document.write(html);
+      document.close();
+    } catch (err) {
+      alert("Scan failed. Check your Node.js server.");
+      location.reload();
+    }
+  });
+</script>
+</body>
+</html>
