@@ -88,11 +88,11 @@
       <div class="text-cyan text-[10px] uppercase tracking-[0.4em] mb-4 animate-pulse">Running Deep Scan...</div>
       <div class="ld-track"><div class="ld-fill"></div></div>
       <div id="status-steps" class="flex flex-col gap-3 w-[280px]">
-        <div class="ld-step" data-delay="500">Connecting to PageSpeed API...</div>
-        <div class="ld-step" data-delay="1200">Analyzing Hick's Law Coefficient...</div>
-        <div class="ld-step" data-delay="2000">Calculating Loss Aversion Impact...</div>
-        <div class="ld-step" data-delay="2800">Mapping Decision Tree Friction...</div>
-        <div class="ld-step" data-delay="3600">Generating Executive Dashboard...</div>
+        <div class="ld-step" data-delay="500">⟩_ Resolving domain infrastructure...</div>
+        <div class="ld-step" data-delay="1200">⟩_ Analyzing Hick's Law Friction...</div>
+        <div class="ld-step" data-delay="2000">⟩_ Calculating LCP Revenue Penalty...</div>
+        <div class="ld-step" data-delay="2800">⟩_ Scanning INP Response Delays...</div>
+        <div class="ld-step" data-delay="3600">⟩_ Generating Executive Audit Report...</div>
       </div>
     </div>
   </div>
@@ -129,10 +129,9 @@
         }),
         minWait
       ]);
-      const html = await response[0].text();
-      document.open();
-      document.write(html);
-      document.close();
+      const data = await response[0].json();
+      sessionStorage.setItem('auditData', JSON.stringify(data));
+      window.location.href = '/audit';
     } catch (err) {
       alert("Scan failed. Check your Node.js server.");
       location.reload();

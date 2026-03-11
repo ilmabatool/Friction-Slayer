@@ -6,6 +6,7 @@
         "github.vscode-github-actions",
         "github.vscode-pull-request-github",
         "ms-vscode.remote-repositories",
-        "github.codespaces"
+        "github.codespaces",
+        "github.github-vscode-theme"
     ]
 }

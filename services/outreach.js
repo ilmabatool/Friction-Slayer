@@ -2,12 +2,60 @@
 require('dotenv').config();
 const fs    = require('fs');
 const path  = require('path');
+const https = require('https');
 const cron  = require('node-cron');
 const { Resend } = require('resend');
+const { calculateLeak } = require('../utils/leak_calc');
 
 const resend      = new Resend(process.env.RESEND_API_KEY);
 const LEADS_PATH  = path.join(__dirname, '..', 'leads.json');
-const FROM_EMAIL  = 'Qaseem.pk <hello@qaseem.pk>';
+const FROM_EMAIL  = 'Qaseem.pk <admin@qaseem.pk>';
+
+// ─── PageSpeed Helper ──────────────────────────────────────────────────────────
+
+/**
+ * Fetch real LCP and INP from Google PageSpeed Insights API (mobile strategy).
+ * Falls back to conservative defaults if the API key is missing or the call fails.
+ *
+ * @param {string} siteUrl
+ * @returns {Promise<{ lcp: number, inp: number, fromFallback: boolean }>}
+ */
+function getPageSpeedMetrics(siteUrl) {
+  const DEFAULTS = { lcp: 3.5, inp: 250, fromFallback: true };
+  const apiKey   = process.env.PAGESPEED_API_KEY;
+  if (!apiKey || !siteUrl) return Promise.resolve(DEFAULTS);
+
+  const encoded  = encodeURIComponent(siteUrl);
+  const endpoint = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encoded}&key=${apiKey}&strategy=mobile`;
+
+  return new Promise((resolve) => {
+    const req = https.get(endpoint, (res) => {
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => {
+        try {
+          const json     = JSON.parse(body);
+          const audits   = json?.lighthouseResult?.audits || {};
+
+          // LCP: numericValue from Lighthouse is in milliseconds → convert to seconds
+          const lcpMs = audits['largest-contentful-paint']?.numericValue;
+          const lcp   = typeof lcpMs === 'number' ? lcpMs / 1000 : DEFAULTS.lcp;
+
+          // INP: experimental-interaction-to-next-paint (already in ms)
+          const inp = audits['experimental-interaction-to-next-paint']?.numericValue
+                   ?? audits['interaction-to-next-paint']?.numericValue
+                   ?? DEFAULTS.inp;
+
+          resolve({ lcp, inp, fromFallback: false });
+        } catch {
+          resolve(DEFAULTS);
+        }
+      });
+    });
+    req.on('error', () => resolve(DEFAULTS));
+    req.setTimeout(15_000, () => { req.destroy(); resolve(DEFAULTS); });
+  });
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -61,20 +109,21 @@ function upsertLead(email, siteUrl, leakAmount, monthlyLeak) {
 // ─── Email: Initial Scare Email ────────────────────────────────────────────────
 
 /**
- * Send the "Revenue Leak Alert" cold email.
+ * Send the "Revenue Leak Alert" cold email (Email 1 — The Scare).
  *
  * Psychological levers used:
- *   • Loss Aversion  — front-loads the dollar loss they've already suffered
+ *   • Loss Aversion  — front-loads the annual dollar loss
  *   • Anchoring      — $2,000 manual audit → $0 (our fix)
- *   • Social Proof   — reference to "agenecy audit" implies authority
+ *   • Social Proof   — reference to "agency audit" implies authority
  *   • Scarcity       — 48-hour window
  *
  * @param {string} targetEmail
- * @param {number} leakAmount   - daily dollar leak
+ * @param {number} annualLeak    - annual dollar leak (from calculateLeak)
  * @param {string} [siteUrl]
+ * @param {string} [businessName]
  */
-async function sendInitialScareEmail(targetEmail, leakAmount, siteUrl = '') {
-  const annualLeak = leakAmount * 365;
+async function sendInitialScareEmail(targetEmail, annualLeak, siteUrl = '', businessName = '') {
+  const dailyLoss = Math.round(annualLeak / 365);
 
   const htmlBody = `
 <!DOCTYPE html>
@@ -95,18 +144,18 @@ async function sendInitialScareEmail(targetEmail, leakAmount, siteUrl = '') {
 
       <!-- Alert Banner -->
       <div style="background:#1a0000;border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:20px 24px;margin-bottom:32px;">
-        <p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#f87171;margin:0 0 8px;">⚠ Revenue Leak Detected</p>
+        <p style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#f87171;margin:0 0 8px;">⚠ Annual Revenue Leak Detected</p>
         <p style="font-size:38px;font-weight:900;color:#ef4444;margin:0;line-height:1;letter-spacing:-1px;">
-          $${leakAmount.toLocaleString()}/day
+          $${annualLeak.toLocaleString()}/year
         </p>
         <p style="font-size:13px;color:#9ca3af;margin:8px 0 0;">
-          That is <strong style="color:#f87171;">$${annualLeak.toLocaleString()} leaking from your business every year.</strong>
+          That is <strong style="color:#f87171;">$${dailyLoss.toLocaleString()} leaking from your business every single day.</strong>
         </p>
       </div>
 
       <!-- Body -->
       <p style="font-size:15px;line-height:1.75;color:#d1d5db;margin:0 0 20px;">
-        Our Friction-Slayer algorithm scanned <span style="color:#fff;font-weight:600;">${siteUrl || 'your website'}</span>
+        Our Friction-Slayer algorithm scanned <span style="color:#fff;font-weight:600;">${siteUrl || (businessName ? businessName + '\'s online presence' : 'your website')}</span>
         and identified critical UX friction points that are silently costing you conversions right now.
       </p>
 
@@ -118,7 +167,7 @@ async function sendInitialScareEmail(targetEmail, leakAmount, siteUrl = '') {
 
       <p style="font-size:15px;line-height:1.75;color:#d1d5db;margin:0 0 32px;">
         But this offer has a window. Every day you wait, you're leaving
-        <strong style="color:#ef4444;">$${leakAmount.toLocaleString()}</strong> on the table.
+        <strong style="color:#ef4444;">$${dailyLoss.toLocaleString()}</strong> on the table.
       </p>
 
       <!-- CTA -->
@@ -149,7 +198,7 @@ async function sendInitialScareEmail(targetEmail, leakAmount, siteUrl = '') {
   const { data, error } = await resend.emails.send({
     from:    FROM_EMAIL,
     to:      targetEmail,
-    subject: `⚠ Revenue Alert: Your site is losing $${leakAmount.toLocaleString()}/day`,
+    subject: `URGENT: Your $${annualLeak.toLocaleString()} Annual Revenue Leak`,
     html:    htmlBody,
   });
 
@@ -169,14 +218,18 @@ async function sendInitialScareEmail(targetEmail, leakAmount, siteUrl = '') {
 // ─── Email: Dolphin Offer (Follow-up) ─────────────────────────────────────────
 
 /**
- * Send the "Dolphin Offer" follow-up for leads who haven't replied
- * within 24 hours of the initial email.
+ * Send the "Dolphin Offer" follow-up (Email 2 — The Dolphin Hook).
+ * Scheduled 24h after the Scare email for non-responders.
+ * Subject: "A 5-minute fix for [Business_Name]"
  *
  * @param {string} targetEmail
- * @param {number} leakAmount
+ * @param {number} annualLeak
  * @param {string} [siteUrl]
+ * @param {string} [businessName]
  */
-async function sendDolphinOfferEmail(targetEmail, leakAmount, siteUrl = '') {
+async function sendDolphinOfferEmail(targetEmail, annualLeak, siteUrl = '', businessName = '') {
+  const dailyLoss = Math.round(annualLeak / 365);
+  const displayName = businessName || 'your business';
   const htmlBody = `
 <!DOCTYPE html>
 <html lang="en">
@@ -201,8 +254,9 @@ async function sendDolphinOfferEmail(targetEmail, leakAmount, siteUrl = '') {
       </div>
 
       <p style="font-size:15px;line-height:1.75;color:#d1d5db;margin:0 0 20px;">
-        Yesterday we flagged <strong style="color:#ef4444;">$${leakAmount.toLocaleString()}/day</strong> leaking from
-        <span style="color:#fff;">${siteUrl || 'your site'}</span>. You haven't replied yet —
+        Yesterday we flagged a <strong style="color:#ef4444;">$${annualLeak.toLocaleString()} annual revenue leak</strong>
+        ($${dailyLoss.toLocaleString()}/day) connected to
+        <span style="color:#fff;">${siteUrl || displayName}</span>. You haven't replied yet —
         which means that leak is still running.
       </p>
 
@@ -210,14 +264,15 @@ async function sendDolphinOfferEmail(targetEmail, leakAmount, siteUrl = '') {
         Here's the deal: reply to this email and we will fix
         <strong style="color:#fff;">the single highest-friction element</strong> on your site
         in <strong style="color:#22d3ee;">5 minutes, for free.</strong>
-        No pitch, no upsell on the call, no invoice.
+        No pitch, no upsell on the call, no invoice. This is the
+        <em style="color:#22d3ee;">Dolphin Offer</em> — we prove ROI before asking for anything.
       </p>
 
       <p style="font-size:15px;line-height:1.75;color:#d1d5db;margin:0 0 32px;">
         A comparable single-page UX fix from a boutique agency runs
         <strong style="color:#9ca3af;text-decoration:line-through;">$500</strong>.
         You're getting it at <strong style="color:#22d3ee;">$0</strong>
-        because we want to prove the ROI before asking for anything.
+        because we believe in the work first.
       </p>
 
       <!-- CTA -->
@@ -246,7 +301,7 @@ async function sendDolphinOfferEmail(targetEmail, leakAmount, siteUrl = '') {
   const { data, error } = await resend.emails.send({
     from:    FROM_EMAIL,
     to:      targetEmail,
-    subject: `🐬 Dolphin Offer: Your free 5-minute fix expires today`,
+    subject: `A 5-minute fix for ${displayName}`,
     html:    htmlBody,
   });
 
@@ -289,16 +344,90 @@ function startLeadCron() {
           !lead.dolphinSentAt &&
           now - new Date(lead.initialSentAt).getTime() >= TWENTY_FOUR_H
         ) {
-          console.log(`[cron] Sending Dolphin Offer to ${lead.email}`);
-          await sendDolphinOfferEmail(lead.email, lead.leakAmount, lead.siteUrl);
+          const contactId  = lead.email || lead.phone || '';
+          const leakAmount = lead.revenue_leak ?? lead.leakAmount ?? 0;
+          console.log(`[cron] Sending Dolphin Offer to ${contactId}`);
+          await sendDolphinOfferEmail(
+            contactId,
+            leakAmount,
+            lead.siteUrl || lead.website || '',
+            lead.business_name || lead.businessName || ''
+          );
         }
       } catch (err) {
-        console.error(`[cron] Failed to send to ${lead.email}:`, err.message);
+        console.error(`[cron] Failed for lead "${lead.business_name || lead.email}":`, err.message);
       }
     }
   });
-
-  console.log('[cron] Lead follow-up scheduler running (09:00 daily).');
 }
 
-module.exports = { upsertLead, sendInitialScareEmail, sendDolphinOfferEmail, startLeadCron };
+// ─── Standalone Script: Blast All Uncontacted Leads ──────────────────────────
+// Run directly:  node services/outreach.js
+
+if (require.main === module) {
+  (async () => {
+    const leads = readLeads();
+    const pending = leads.filter(l => !l.initialSentAt);
+
+    if (pending.length === 0) {
+      console.log('[outreach] No pending leads to process.');
+      process.exit(0);
+    }
+
+    console.log(`[outreach] Processing ${pending.length} uncontacted lead(s)…\n`);
+    let sent = 0, failed = 0;
+
+    for (const lead of pending) {
+      const siteUrl      = lead.siteUrl || lead.website || '';
+      const businessName = lead.business_name || lead.businessName || '';
+      const contactId    = lead.email || lead.phone || '';
+
+      if (!contactId) {
+        console.warn(`  [skip] "${businessName}" — no email or phone on record`);
+        continue;
+      }
+
+      // ── Fetch real PageSpeed metrics (or fall back to defaults) ──
+      let metrics;
+      if (siteUrl) {
+        process.stdout.write(`  [psapi] Checking ${siteUrl} … `);
+        metrics = await getPageSpeedMetrics(siteUrl);
+        console.log(metrics.fromFallback
+          ? 'fallback defaults'
+          : `LCP ${metrics.lcp.toFixed(2)}s  INP ${Math.round(metrics.inp)}ms`
+        );
+      } else {
+        // No website → both penalties fire (worst case)
+        metrics = { lcp: 3.5, inp: 250, fromFallback: true };
+        console.log(`  [psapi] "${businessName}" has no website — using worst-case defaults`);
+      }
+
+      // ── Calculate leak ──
+      const { annualLeak, monthlyExposure, dailyLoss } = calculateLeak(metrics);
+
+      // ── Persist revenue_leak back to leads.json ──
+      lead.revenue_leak    = annualLeak;
+      lead.lcp             = metrics.lcp;
+      lead.inp             = metrics.inp;
+      writeLeads(leads);
+
+      // ── Send Email 1: The Scare ──
+      try {
+        await sendInitialScareEmail(contactId, annualLeak, siteUrl, businessName);
+        console.log(`  [sent] Email 1 → ${contactId}  ($${annualLeak.toLocaleString()} annual leak)`);
+        sent++;
+      } catch (err) {
+        console.error(`  [fail] Email 1 → ${contactId}: ${err.message}`);
+        failed++;
+      }
+
+      // Small delay between sends to respect API rate limits
+      await new Promise(r => setTimeout(r, 1_200));
+    }
+
+    console.log(`\n[outreach] Done. ✓ ${sent} sent   ✗ ${failed} failed`);
+    process.exit(failed > 0 ? 1 : 0);
+  })();
+}
+
+module.exports = { upsertLead, sendInitialScareEmail, sendDolphinOfferEmail, startLeadCron, getPageSpeedMetrics };
