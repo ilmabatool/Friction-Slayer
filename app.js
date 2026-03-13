@@ -12,22 +12,29 @@ app.use(express.static(path.join(__dirname)));
 app.get('/',      (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/audit', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'audit.html')));
 
-
+// ─── Analysis Route: Returns JSON for the Luxury Terminal UI ────────────────
 app.post('/analyze', async (req, res) => {
   try {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'URL required.' });
 
+    // 1. Run Intelligence Scans
     const [hicks, cwv] = await Promise.all([
       analyzeHicksLaw(url),
       getPageSpeedMetrics(url),
     ]);
 
-    const { annualLeak, monthlyExposure, dailyLoss } = calculateLeak({ lcp: cwv.lcp, inp: cwv.inp });
+    // 2. Quantify Revenue Leak
+    const { annualLeak, monthlyExposure, dailyLoss } = calculateLeak({ 
+      lcp: cwv.lcp, 
+      inp: cwv.inp,
+      elements: hicks.total 
+    });
 
     const isParalysis = hicks.verdict === 'Decision Paralysis';
-    const hicksScore  = isParalysis ? 87 : 22;
+    const hicksScore  = isParalysis ? "High Friction" : "Optimized";
 
+    // 3. Return Intelligence Payload
     res.json({
       siteUrl:         url,
       annualLeak,
@@ -35,13 +42,13 @@ app.post('/analyze', async (req, res) => {
       dailyLoss,
       lcp:             cwv.lcp,
       inp:             cwv.inp,
-      lcpFromFallback: cwv.fromFallback,
       hicksVerdict:    hicks.verdict,
       hicksScore,
       hicksMessage:    hicks.message,
       hicksTotal:      hicks.total,
     });
   } catch (err) {
+    console.error('[analyze] Error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

@@ -14,5 +14,8 @@
     "express": "^5.2.1",
     "node-cron": "^4.2.1",
     "resend": "^6.9.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
   }
 }

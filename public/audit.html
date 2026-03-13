@@ -3,465 +3,499 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Executive Audit &middot; Qaseem.pk</title>
+  <title>EXECUTIVE BRIEFING — FRICTION-SLAYER</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    body {
-      background: #050505;
-      color: #fff;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    :root { --accent: #00ffff; --bg: #050505; --danger: #ff4d4d; }
+    body { 
+      background: var(--bg); 
+      background-image: 
+        radial-gradient(circle at top right, rgba(0, 255, 255, 0.08), transparent 40%),
+        linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px), 
+        linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 100% 100%, 40px 40px, 40px 40px;
+      color: #fff; 
+      font-family: 'Space Grotesk', sans-serif; 
       min-height: 100vh;
+    }
+    
+    .neon-glow { text-shadow: 0 0 10px var(--accent), 0 0 20px var(--accent); }
+    .danger-glow { text-shadow: 0 0 15px var(--danger), 0 0 30px var(--danger); }
+    .terminal-text { font-family: 'JetBrains Mono', monospace; }
+
+    .glass-card {
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: rgba(8, 6, 14, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 12px;
+      height: 100%;
+      box-sizing: border-box;
+      transition: all 0.3s ease;
+    }
+    .glass-card:hover {
+      background: rgba(8, 6, 14, 0.98);
+    }
+
+    .pricing-card.highlight {
+      border: 2px solid var(--accent);
+      background: rgba(0, 255, 255, 0.03);
+      transform: scale(1.05);
+      z-index: 10;
+    }
+
+    #lead-modal { display: none; background: rgba(0,0,0,0.9); backdrop-filter: blur(10px); }
+    #lead-modal.active { display: flex; }
+
+    @keyframes countUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-count { animation: countUp 1s ease-out forwards; }
+
+    /* ── Live System Activity ───────────────────────────────── */
+    .activity-terminal {
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      background: rgba(6, 4, 12, 0.88);
+      border: 1px solid rgba(255, 215, 0, 0.18);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .activity-terminal__header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 20px;
+      border-bottom: 1px solid rgba(255, 215, 0, 0.07);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      color: rgba(255, 215, 0, 0.45);
+      text-transform: uppercase;
+      user-select: none;
+    }
+
+    .activity-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #00cc66;
+      box-shadow: 0 0 8px rgba(0, 204, 102, 0.9);
+      flex-shrink: 0;
+      animation: dot-blink 2.4s ease-in-out infinite;
+    }
+
+    @keyframes dot-blink {
+      0%, 100% { opacity: 1;   box-shadow: 0 0 6px rgba(0, 204, 102, 0.6); }
+      50%       { opacity: 0.45; box-shadow: 0 0 16px rgba(0, 204, 102, 1); }
+    }
+
+    .activity-count {
+      margin-left: auto;
+      color: rgba(255, 255, 255, 0.18);
+      letter-spacing: 0.06em;
+    }
+
+    .activity-log-outer {
+      position: relative;
+      height: 228px;
+      overflow: hidden;
+      mask-image: linear-gradient(
+        to bottom,
+        transparent 0%,
+        black 16%,
+        black 84%,
+        transparent 100%
+      );
+      -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0%,
+        black 16%,
+        black 84%,
+        transparent 100%
+      );
+    }
+
+    .activity-log-inner {
+      height: 100%;
+      overflow-y: scroll;
+      scrollbar-width: none;
+      padding: 14px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+      box-sizing: border-box;
+    }
+    .activity-log-inner::-webkit-scrollbar { display: none; }
+
+    .activity-entry {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      line-height: 1.55;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-shrink: 0;
       opacity: 0;
-      animation: dashIn 0.55s ease 0.05s forwards;
-    }
-    @keyframes dashIn { to { opacity: 1; } }
-
-    /* ── TOP NAV ── */
-    .top-nav {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      height: 50px;
-      background: rgba(5,5,5,0.9);
-      border-bottom: 1px solid rgba(255,255,255,0.055);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 1.75rem;
-    }
-    .nav-brand {
-      font-size: 0.6rem; letter-spacing: 0.22em;
-      text-transform: uppercase; color: rgba(255,255,255,0.25); font-weight: 700;
-    }
-    .nav-center {
-      position: absolute; left: 50%; transform: translateX(-50%);
-      font-size: 0.58rem; letter-spacing: 0.16em;
-      text-transform: uppercase; color: rgba(255,255,255,0.13);
-    }
-    .nav-badge {
-      font-size: 0.55rem; letter-spacing: 0.13em; text-transform: uppercase;
-      background: rgba(239,68,68,0.1); color: rgba(239,68,68,0.7);
-      border: 1px solid rgba(239,68,68,0.2);
-      padding: 0.22rem 0.65rem; border-radius: 4px;
+      transform: translateY(5px);
+      animation: entry-in 0.35s ease forwards;
     }
 
-    /* ── MAIN ── */
-    .main {
-      max-width: 1080px;
-      margin: 0 auto;
-      padding: 74px 1.75rem 5rem;
+    @keyframes entry-in {
+      to { opacity: 1; transform: translateY(0); }
     }
 
-    /* ── EXEC HEADER ── */
-    .exec-header {
-      padding: 2.5rem 0 2rem;
-      border-bottom: 1px solid rgba(255,255,255,0.055);
-      margin-bottom: 1.75rem;
-    }
-    .exec-url {
-      font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase;
-      color: rgba(255,255,255,0.16); margin-bottom: 1rem;
-    }
-    .exec-url span { color: rgba(255,255,255,0.35); }
-    .exec-h1 {
-      font-size: clamp(1.8rem, 4vw, 2.6rem);
-      font-weight: 900; line-height: 1.1; letter-spacing: -0.025em; margin-bottom: 1.1rem;
-    }
-    .exec-h1 .red-grad {
-      background: linear-gradient(135deg, #ff3030, #dc2626);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-    }
-    .risk-badge {
-      display: inline-flex; align-items: center; gap: 0.5rem;
-      background: rgba(239,68,68,0.1); color: #ef4444;
-      border: 1px solid rgba(239,68,68,0.25);
-      font-size: 0.6rem; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase;
-      padding: 0.35rem 0.85rem; border-radius: 5px;
-    }
-    .risk-pulse {
-      width: 6px; height: 6px; border-radius: 50%; background: #ef4444;
-      animation: pulse 1.4s ease-in-out infinite;
-    }
-    @keyframes pulse {
-      0%,100% { box-shadow: 0 0 0 0   rgba(239,68,68,0.6); }
-      50%      { box-shadow: 0 0 0 6px rgba(239,68,68,0);   }
+    .ae-time {
+      color: rgba(255, 255, 255, 0.18);
+      flex-shrink: 0;
+      font-size: 10px;
+      min-width: 54px;
     }
 
-    /* ── KPI GRID ── */
-    .kpi-grid {
-      display: grid;
-      grid-template-columns: 1.5fr 1fr 1fr;
-      gap: 1px;
-      background: rgba(255,255,255,0.055);
-      border: 1px solid rgba(255,255,255,0.055);
-      border-radius: 14px; overflow: hidden;
-      margin-bottom: 1.5rem;
-    }
-    @media (max-width: 600px) { .kpi-grid { grid-template-columns: 1fr; } }
-    .kpi-card {
-      background: #050505; padding: 2rem 1.75rem;
-      display: flex; flex-direction: column;
-    }
-    .kpi-card.primary { background: #070707; }
-    .kpi-label {
-      font-size: 0.58rem; letter-spacing: 0.2em; text-transform: uppercase;
-      color: rgba(255,255,255,0.2); margin-bottom: 1rem;
-    }
-    .kpi-value {
-      font-size: clamp(2.8rem, 7vw, 4.2rem);
-      font-weight: 900; line-height: 1; letter-spacing: -0.03em;
-      color: #ef4444; text-shadow: 0 0 60px rgba(239,68,68,0.32);
-    }
-    .kpi-value.sm { font-size: clamp(2rem, 5vw, 2.9rem); text-shadow: 0 0 40px rgba(239,68,68,0.22); }
-    .kpi-sub { font-size: 0.68rem; color: rgba(255,255,255,0.14); margin-top: 0.6rem; letter-spacing: 0.04em; }
-    .kpi-tagline { font-size: 0.8rem; color: rgba(255,255,255,0.32); margin-top: 0.65rem; line-height: 1.55; }
-    .kpi-tagline strong { color: rgba(255,255,255,0.6); }
-
-    /* ── ANALYSIS GRID ── */
-    .analysis-grid {
-      display: grid;
-      grid-template-columns: 1.05fr 0.95fr;
-      gap: 1px;
-      background: rgba(255,255,255,0.055);
-      border: 1px solid rgba(255,255,255,0.055);
-      border-radius: 14px; overflow: hidden;
-      margin-bottom: 1.5rem;
-    }
-    @media (max-width: 680px) { .analysis-grid { grid-template-columns: 1fr; } }
-    .a-panel { background: #050505; padding: 1.75rem; }
-    .a-panel.alt { background: #060606; }
-    .panel-label {
-      font-size: 0.58rem; letter-spacing: 0.2em; text-transform: uppercase;
-      color: rgba(255,255,255,0.18); margin-bottom: 1.25rem;
+    .ae-label {
+      color: rgba(255, 215, 0, 0.35);
+      flex-shrink: 0;
     }
 
-    /* Hick's Law panel */
-    .score-row { display: flex; align-items: flex-end; gap: 0.5rem; margin-bottom: 1.2rem; }
-    .score-num { font-size: 4rem; font-weight: 900; line-height: 1; letter-spacing: -0.04em; }
-    .score-denom { font-size: 1rem; color: rgba(255,255,255,0.2); margin-bottom: 0.45rem; }
-    .score-sev {
-      font-size: 0.58rem; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase;
-      padding: 0.25rem 0.65rem; border-radius: 4px; margin-bottom: 0.45rem; margin-left: auto; align-self: flex-start;
-    }
-    .score-track {
-      height: 4px; background: rgba(255,255,255,0.06);
-      border-radius: 4px; overflow: hidden; margin-bottom: 1rem;
-    }
-    .score-fill { height: 100%; border-radius: 4px; transition: width 1.4s cubic-bezier(0.4,0,0.2,1); }
-    .friction-verdict { font-size: 0.82rem; font-weight: 700; color: rgba(255,255,255,0.65); margin-bottom: 0.5rem; }
-    .friction-msg { font-size: 0.78rem; color: rgba(255,255,255,0.28); line-height: 1.7; }
+    .ae-biz  { color: rgba(255, 215, 0, 0.88); }
+    .ae-pipe { color: rgba(255, 255, 255, 0.15); margin: 0 2px; }
+    .ae-leak { color: #ff6b6b; font-weight: 600; }
+    .ae-status { color: #00cc66; }
 
-    /* Revenue model panel */
-    .rev-row {
-      display: flex; align-items: flex-start; gap: 0.75rem;
-      padding: 0.9rem 0; border-bottom: 1px solid rgba(255,255,255,0.045);
+    @property --angle {
+      syntax: '<angle>';
+      initial-value: 0deg;
+      inherits: false;
     }
-    .rev-row:last-child { border-bottom: none; }
-    .rev-icon {
-      font-size: 0.72rem; background: rgba(255,255,255,0.04);
-      border-radius: 6px; padding: 0.35rem 0.45rem; flex-shrink: 0; margin-top: 0.1rem;
+    @keyframes rotate { to { --angle: 360deg; } }
+    .beam-wrapper {
+      border-radius: 13px;
+      padding: 1px;
+      background: conic-gradient(
+        from var(--angle),
+        transparent 78%,
+        #FFD700 90%,
+        rgba(255, 215, 0, 0.5) 94%,
+        transparent 100%
+      );
+      animation: rotate 5s linear infinite;
     }
-    .rev-lbl { font-size: 0.78rem; font-weight: 700; color: rgba(255,255,255,0.58); margin-bottom: 0.2rem; }
-    .rev-detail { font-size: 0.72rem; color: rgba(255,255,255,0.24); line-height: 1.65; }
-
-    /* ── CWV BADGE ROW ── */
-    .cwv-row {
-      display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1.1rem;
-    }
-    .cwv-badge {
-      display: flex; flex-direction: column; align-items: center;
-      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
-      border-radius: 8px; padding: 0.6rem 1rem; min-width: 90px;
-    }
-    .cwv-badge.bad  { border-color: rgba(239,68,68,0.3);  background: rgba(239,68,68,0.05); }
-    .cwv-badge.good { border-color: rgba(34,197,94,0.3);  background: rgba(34,197,94,0.05); }
-    .cwv-key   { font-size: 0.52rem; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(255,255,255,0.25); margin-bottom: 0.3rem; }
-    .cwv-val   { font-size: 1.1rem; font-weight: 900; letter-spacing: -0.02em; }
-    .cwv-val.red  { color: #ef4444; }
-    .cwv-val.green { color: #22c55e; }
-
-    /* ── ACTION PLAN ── */
-    .action-wrap {
-      border: 1px solid rgba(255,255,255,0.055);
-      border-radius: 14px; overflow: hidden; margin-bottom: 1.5rem;
-    }
-    .action-head {
-      background: #070707; padding: 1.25rem 1.75rem;
-      border-bottom: 1px solid rgba(255,255,255,0.055);
-    }
-    .section-label {
-      font-size: 0.58rem; letter-spacing: 0.2em; text-transform: uppercase;
-      color: rgba(255,255,255,0.18); margin-bottom: 0.6rem;
-    }
-    .action-desc { font-size: 0.84rem; color: rgba(255,255,255,0.3); line-height: 1.65; }
-    .action-body { padding: 1.5rem 1.75rem; }
-    .price-row {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 0.85rem 1rem; border-radius: 8px; margin-bottom: 0.5rem;
-    }
-    .price-lbl { font-size: 0.85rem; color: rgba(255,255,255,0.32); }
-    .price-val { font-size: 0.95rem; font-weight: 700; color: rgba(255,255,255,0.18); text-decoration: line-through; }
-    .price-row.sub .price-lbl { color: rgba(255,255,255,0.28); }
-    .price-row.sub .price-val { color: rgba(239,68,68,0.45); text-decoration: none; font-size: 0.9rem; }
-    .divider { height: 1px; background: rgba(255,255,255,0.045); margin: 0.75rem 0; }
-    .price-row.total {
-      background: rgba(34,211,238,0.05);
-      border: 1px solid rgba(34,211,238,0.18);
-      margin-top: 0.75rem; margin-bottom: 0;
-    }
-    .price-row.total .price-lbl { color: #fff; font-weight: 700; font-size: 0.9rem; }
-    .price-row.total .price-val { color: #22d3ee; font-size: 1.35rem; text-decoration: none; }
-
-    /* ── CTA ── */
-    .cta-wrap {
-      border: 1px solid rgba(255,255,255,0.055);
-      border-radius: 14px; overflow: hidden;
-    }
-    .cta-inner { padding: 2rem 1.75rem 1.5rem; }
-    .cta-btn {
-      display: block; width: 100%;
-      padding: 1.1rem 1.5rem; border-radius: 10px;
-      background: #22d3ee; color: #000;
-      font-weight: 900; font-size: 0.88rem;
-      letter-spacing: 0.07em; text-transform: uppercase;
-      text-align: center; text-decoration: none;
-      box-shadow: 0 0 50px rgba(34,211,238,0.45), 0 0 100px rgba(34,211,238,0.15);
-      transition: background 0.2s, box-shadow 0.2s;
-      margin-bottom: 0.75rem;
-    }
-    .cta-btn:hover {
-      background: #67e8f9;
-      box-shadow: 0 0 70px rgba(34,211,238,0.6), 0 0 140px rgba(34,211,238,0.22);
-    }
-    .cta-sub {
-      text-align: center; font-size: 0.62rem;
-      color: rgba(255,255,255,0.13); letter-spacing: 0.06em; text-transform: uppercase;
-    }
-    .cd-footer {
-      background: #070707; padding: 1rem 1.75rem;
-      border-top: 1px solid rgba(255,255,255,0.05);
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .cd-lbl { font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.18); }
-    .cd-timer {
-      font-size: 1.25rem; font-weight: 900; color: #f87171;
-      letter-spacing: 0.1em; font-variant-numeric: tabular-nums;
-    }
-
-    /* ── FALLBACK STATE ── */
-    .no-data {
-      text-align: center; padding: 4rem 1rem;
-      color: rgba(255,255,255,0.2); font-size: 0.9rem;
-    }
-    .no-data a { color: #22d3ee; text-decoration: none; }
   </style>
 </head>
-<body>
+<body class="p-8">
 
-  <!-- TOP NAV -->
-  <nav class="top-nav">
-    <span class="nav-brand">Qaseem.pk</span>
-    <span class="nav-center">Executive Audit &mdash; Confidential</span>
-    <span class="nav-badge" id="nav-risk-badge">Risk Level: Critical</span>
-  </nav>
+  <header class="flex justify-between items-center mb-16 border-b border-white/10 pb-6">
+    <div class="tracking-[0.5em] text-xs font-bold uppercase text-white/40">EXECUTIVE AUDIT // FRICTION-SLAYER</div>
+    <div class="terminal-text text-cyan-400 text-xs" id="timestamp">--:--:--</div>
+  </header>
 
-  <div class="main" id="audit-root">
-    <!-- Populated dynamically from sessionStorage by the script below -->
-    <div class="no-data" id="no-data-msg" style="display:none;">
-      No audit data found. <a href="/">Run a scan first &rarr;</a>
+  <main class="max-w-6xl mx-auto">
+    
+    <!-- THE LEAD: REVENUE LEAK -->
+    <section class="text-center mb-24">
+      <h2 class="text-xs tracking-[0.3em] uppercase text-white/40 mb-4">Calculated Annual Revenue Leak</h2>
+      <div id="annual-leak" class="text-8xl md:text-9xl font-extrabold text-[#ff4d4d] danger-glow animate-count">
+        $0
+      </div>
+      <p class="mt-6 text-white/60 terminal-text max-w-xl mx-auto text-sm uppercase">
+        Our scan of <span id="site-url" class="text-white">...</span> detected critical technical & psychological bottlenecks.
+      </p>
+    </section>
+
+    <!-- THE GRID: BENTO CARDS -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-24">
+      
+      <div class="beam-wrapper">
+      <div class="glass-card p-8 flex flex-col justify-between">
+        <div>
+          <h3 class="text-xs tracking-widest text-white/30 uppercase mb-6">LCP STATUS</h3>
+          <div id="lcp-val" class="text-5xl font-bold mb-2">-.--s</div>
+          <div id="lcp-verdict" class="text-xs font-bold px-2 py-1 rounded w-fit uppercase">---</div>
+        </div>
+        <p class="text-xs text-white/40 mt-6 leading-relaxed">
+          Largest Contentful Paint measures loading performance. > 2.5s causes immediate bounce.
+        </p>
+      </div>
+      </div>
+
+      <div class="beam-wrapper">
+      <div class="glass-card p-8 flex flex-col justify-between">
+        <div>
+          <h3 class="text-xs tracking-widest text-white/30 uppercase mb-6">INP LATENCY</h3>
+          <div id="inp-val" class="text-5xl font-bold mb-2">---ms</div>
+          <div id="inp-verdict" class="text-xs font-bold px-2 py-1 rounded w-fit uppercase">---</div>
+        </div>
+        <p class="text-xs text-white/40 mt-6 leading-relaxed">
+          Interaction to Next Paint correlates directly with user frustration levels.
+        </p>
+      </div>
+      </div>
+
+      <div class="beam-wrapper">
+      <div class="glass-card p-8 flex flex-col justify-between">
+        <div>
+          <h3 class="text-xs tracking-widest text-white/30 uppercase mb-6">HICK'S FRICTION</h3>
+          <div id="hicks-val" class="text-5xl font-bold mb-2">--</div>
+          <div id="hicks-verdict" class="text-xs font-bold px-2 py-1 rounded w-fit uppercase">---</div>
+        </div>
+        <p id="hicks-advice" class="text-xs text-white/40 mt-6 leading-relaxed">
+          Choice overload leads to decision paralysis.
+        </p>
+      </div>
+      </div>
+
+    </div>
+
+    <!-- LIVE SYSTEM ACTIVITY -->
+    <section class="mb-24">
+      <p class="text-xs tracking-[0.4em] uppercase text-white/20 mb-5 terminal-text">Network Feed</p>
+      <div class="activity-terminal">
+        <div class="activity-terminal__header">
+          <div class="activity-dot"></div>
+          <span>Live System Activity</span>
+          <span class="activity-count terminal-text" id="activity-count">initializing...</span>
+        </div>
+        <div class="activity-log-outer">
+          <div class="activity-log-inner" id="activity-log"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- THE CLOSE: PRICING -->
+    <section class="mb-24">
+      <h2 class="text-center text-xs tracking-[0.5em] uppercase text-white/30 mb-12">Actionable Solutions</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        
+        <div class="glass-card p-8 text-center border border-white/5">
+          <div class="text-xs tracking-widest text-white/40 mb-4">TACTICAL FIX</div>
+          <div class="text-4xl font-bold mb-6">$150</div>
+          <ul class="text-xs text-left space-y-3 text-white/60 mb-8 terminal-text">
+            <li>+ LCP Infrastructure Patch</li>
+            <li>+ Image Compression Overhaul</li>
+            <li>+ Basic Friction Analysis</li>
+          </ul>
+        </div>
+
+        <div class="pricing-card highlight p-10 text-center rounded-xl relative">
+          <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-cyan-400 text-black px-4 py-1 text-[10px] font-bold tracking-widest uppercase rounded">The Strategic Choice</div>
+          <div class="text-xs tracking-widest text-cyan-400 mb-4">EXECUTIVE SUITE</div>
+          <div class="text-5xl font-bold mb-8 text-cyan-400 neon-glow">$600</div>
+          <ul class="text-xs text-left space-y-4 text-white/80 mb-10 terminal-text">
+            <li>+ full Hick's Law Audit</li>
+            <li>+ Neuromarketing Optimization</li>
+            <li>+ 1:1 Growth Strategy Call</li>
+            <li>+ 24/7 Priority Support</li>
+          </ul>
+        </div>
+
+        <div class="glass-card p-8 text-center border border-white/5">
+          <div class="text-xs tracking-widest text-white/40 mb-4">ENTERPRISE SCALE</div>
+          <div class="text-4xl font-bold mb-6">$4,500</div>
+          <ul class="text-xs text-left space-y-3 text-white/60 mb-8 terminal-text">
+            <li>+ Custom Pipeline Architect</li>
+            <li>+ Competitor Ghost Scan</li>
+            <li>+ White-Label Reporting</li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- THE DOLPHIN HOOK -->
+    <div class="flex justify-center mb-32">
+      <button onclick="toggleModal(true)" class="bg-cyan-400 text-black font-bold tracking-[0.3em] px-16 py-6 rounded hover:bg-white transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-[0_0_30px_rgba(0,255,255,0.3)]">
+        EXECUTE 5-MINUTE FRICTION FIX (FREE)
+      </button>
+    </div>
+
+  </main>
+
+  <!-- LEAD CAPTURE MODAL -->
+  <div id="lead-modal" class="fixed inset-0 z-[100] items-center justify-center p-6">
+    <div class="glass-card max-w-md w-full p-10 relative">
+      <button onclick="toggleModal(false)" class="absolute top-4 right-6 text-white/40 hover:text-white">&times;</button>
+      <div class="text-center">
+        <div class="text-4xl mb-6">🐬</div>
+        <h3 class="text-xl font-bold mb-2">Claim Your Audit</h3>
+        <p class="text-xs text-white/40 mb-8">Enter your business email to receive the full step-by-step repair guide for your revenue leak.</p>
+        
+        <form id="lead-form" class="space-y-4">
+          <input type="email" id="lead-email" required placeholder="BUSINESS EMAIL" 
+            class="w-full bg-black/50 border border-white/10 p-4 text-sm outline-none focus:border-cyan-400 transition-all terminal-text uppercase">
+          <button type="submit" class="w-full bg-cyan-400 text-black font-bold py-4 rounded tracking-widest hover:bg-white transition-colors">SEND REPAIR GUIDE</button>
+        </form>
+        <div id="lead-status" class="mt-4 text-[10px] terminal-text text-cyan-400/60 uppercase"></div>
+      </div>
     </div>
   </div>
 
   <script>
-  (function () {
-    'use strict';
-
-    // ── Read audit data from sessionStorage ──────────────────────────────────
-    var raw = sessionStorage.getItem('auditData');
-    if (!raw) {
-      document.getElementById('no-data-msg').style.display = 'block';
-      return;
+    function toggleModal(show) {
+      document.getElementById('lead-modal').classList.toggle('active', show);
     }
 
-    var d;
-    try { d = JSON.parse(raw); } catch (e) {
-      document.getElementById('no-data-msg').style.display = 'block';
-      return;
-    }
+    // Load Audit Data
+    window.onload = () => {
+      const data = JSON.parse(sessionStorage.getItem('auditData') || '{}');
+      if (!data.siteUrl) return window.location.href = '/';
 
-    // ── Derived values ────────────────────────────────────────────────────────
-    var annualLeak  = d.annualLeak      || 0;
-    var monthly     = d.monthlyExposure || Math.round(annualLeak / 12);
-    var daily       = d.dailyLoss       || Math.round(annualLeak / 365);
-    var siteUrl     = d.siteUrl         || '';
-    var lcp         = typeof d.lcp === 'number' ? d.lcp   : null;
-    var inp         = typeof d.inp === 'number' ? d.inp   : null;
-    var hicks       = d.hicksData       || {};
-    var fScore      = d.hicksScore      || (hicks.verdict === 'Decision Paralysis' ? 87 : 22);
-    var fVerdict    = d.hicksVerdict    || hicks.verdict  || 'Unknown';
-    var fMsg        = d.hicksMessage    || hicks.message  || '';
-    var isParalysis = fScore >= 50;
-    var fColor      = isParalysis ? '#ef4444' : '#22c55e';
-    var fBg         = isParalysis ? 'rgba(239,68,68,0.08)'  : 'rgba(34,197,94,0.08)';
-    var fBorder     = isParalysis ? 'rgba(239,68,68,0.25)'  : 'rgba(34,197,94,0.25)';
-    var fSeverity   = isParalysis ? 'CRITICAL' : 'LOW RISK';
-    var fLabel      = isParalysis
-      ? "Hick\u2019s Law Violation \u2014 Decision Paralysis"
-      : "Navigation Architecture \u2014 Within Threshold";
+      document.getElementById('site-url').innerText = data.siteUrl.replace(/^https?:\/\//, '');
+      document.getElementById('timestamp').innerText = new Date().toLocaleTimeString();
 
-    // Sanitize URL for display
-    var escUrl = String(siteUrl)
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      // Animate Annual Leak Counter
+      const leakStr = data.annualLeak?.replace(/,/g, '') || "0";
+      const leakVal = parseInt(leakStr);
+      let current = 0;
+      const step = Math.max(1, Math.floor(leakVal / 100));
+      const counter = setInterval(() => {
+        current += step;
+        if (current >= leakVal) {
+          current = leakVal;
+          clearInterval(counter);
+        }
+        document.getElementById('annual-leak').innerText = '$' + current.toLocaleString();
+      }, 10);
 
-    // ── CWV badges ────────────────────────────────────────────────────────────
-    var lcpBadge = '';
-    var inpBadge = '';
-    if (lcp !== null) {
-      var lcpBad  = lcp > 2.5;
-      var lcpClass = lcpBad ? 'bad' : 'good';
-      var lcpVClass = lcpBad ? 'red' : 'green';
-      lcpBadge = '<div class="cwv-badge ' + lcpClass + '">' +
-        '<span class="cwv-key">LCP</span>' +
-        '<span class="cwv-val ' + lcpVClass + '">' + lcp.toFixed(2) + 's</span>' +
-        '</div>';
-    }
-    if (inp !== null) {
-      var inpBad   = inp > 200;
-      var inpClass = inpBad ? 'bad' : 'good';
-      var inpVClass = inpBad ? 'red' : 'green';
-      inpBadge = '<div class="cwv-badge ' + inpClass + '">' +
-        '<span class="cwv-key">INP</span>' +
-        '<span class="cwv-val ' + inpVClass + '">' + Math.round(inp) + 'ms</span>' +
-        '</div>';
-    }
-    var cwvRow = (lcpBadge || inpBadge)
-      ? '<div class="cwv-row">' + lcpBadge + inpBadge + '</div>'
-      : '';
+      // KPI Mapping
+      // LCP
+      const lcp = parseFloat(data.lcp) || 0;
+      document.getElementById('lcp-val').innerText = lcp + 's';
+      const lcpEl = document.getElementById('lcp-verdict');
+      if (lcp > 2.5) {
+        lcpEl.innerText = 'FAIL';
+        lcpEl.classList.add('bg-red-500/20', 'text-red-500');
+      } else {
+        lcpEl.innerText = 'PASS';
+        lcpEl.classList.add('bg-green-500/20', 'text-green-500');
+      }
 
-    // Revenue model detail
-    var leakReasons = [];
-    if (lcp !== null && lcp > 2.5)   leakReasons.push('LCP ' + lcp.toFixed(2) + 's exceeds 2.5s threshold (&minus;15%)');
-    if (inp !== null && inp > 200)    leakReasons.push('INP ' + Math.round(inp) + 'ms exceeds 200ms threshold (&minus;10%)');
-    var lossMsg = leakReasons.length
-      ? 'Your site is bleeding an estimated $' + monthly.toLocaleString() + '/month ($' + daily.toLocaleString() + '/day) because: ' + leakReasons.join(' + ') + '. Every day without a fix, another $' + daily.toLocaleString() + ' walks out the door.'
-      : 'Performance penalties detected. Each friction point compounds conversion abandonment at the critical decision moment.';
+      // INP
+      const inp = parseInt(data.inp) || 0;
+      document.getElementById('inp-val').innerText = inp + 'ms';
+      const inpEl = document.getElementById('inp-verdict');
+      if (inp > 200) {
+        inpEl.innerText = 'WARNING';
+        inpEl.classList.add('bg-red-500/20', 'text-red-500');
+      } else {
+        inpEl.innerText = 'GOOD';
+        inpEl.classList.add('bg-green-500/20', 'text-green-500');
+      }
 
-    // ── Build the page HTML ───────────────────────────────────────────────────
-    var html = '<section class="exec-header">' +
-      '<p class="exec-url">Site Analyzed: <span>' + escUrl + '</span></p>' +
-      '<h1 class="exec-h1">Executive Summary:<br/><span class="red-grad">Revenue Leak Confirmed.</span></h1>' +
-      '<div class="risk-badge"><span class="risk-pulse"></span> Risk Level: Critical</div>' +
-      '</section>' +
+      // Hick's
+      document.getElementById('hicks-val').innerText = data.hicksTotal || '--';
+      const hicksEl = document.getElementById('hicks-verdict');
+      if (data.hicksVerdict === 'Decision Paralysis') {
+        hicksEl.innerText = 'High Friction Alert';
+        hicksEl.classList.add('bg-red-500/20', 'text-red-500');
+        document.getElementById('hicks-advice').innerText = data.hicksMessage;
+      } else {
+        hicksEl.innerText = 'Optimized';
+        hicksEl.classList.add('bg-green-500/20', 'text-green-500');
+      }
+    };
 
-      // KPI GRID
-      '<div class="kpi-grid">' +
-        '<div class="kpi-card primary">' +
-          '<p class="kpi-label">Annual Revenue Leak</p>' +
-          '<p class="kpi-value" id="kpi-annual">$' + annualLeak.toLocaleString() + '</p>' +
-          '<p class="kpi-tagline">That is <strong>$' + daily.toLocaleString() + '</strong> walking out the door every single day.</p>' +
-        '</div>' +
-        '<div class="kpi-card">' +
-          '<p class="kpi-label">Monthly Exposure</p>' +
-          '<p class="kpi-value sm" id="kpi-monthly">$' + monthly.toLocaleString() + '</p>' +
-          '<p class="kpi-sub">per 30 days</p>' +
-        '</div>' +
-        '<div class="kpi-card">' +
-          '<p class="kpi-label">Daily Loss</p>' +
-          '<p class="kpi-value sm" id="kpi-daily">$' + daily.toLocaleString() + '</p>' +
-          '<p class="kpi-sub">every day this goes unfixed</p>' +
-        '</div>' +
-      '</div>' +
+    // ── Live System Activity Feed ───────────────────────────
+    (function () {
+      const log       = document.getElementById('activity-log');
+      const countEl   = document.getElementById('activity-count');
+      let totalAudits = 0;
 
-      // ANALYSIS GRID
-      '<div class="analysis-grid">' +
-        '<div class="a-panel">' +
-          '<p class="panel-label">Hick&rsquo;s Law Analysis &mdash; Friction Load</p>' +
-          '<div class="score-row">' +
-            '<p class="score-num" id="score-num" style="color:' + fColor + ';text-shadow:0 0 55px ' + fColor + '88;">' + fScore + '</p>' +
-            '<p class="score-denom">/ 100</p>' +
-            '<span class="score-sev" style="background:' + fBg + ';color:' + fColor + ';border:1px solid ' + fBorder + ';">' + fSeverity + '</span>' +
-          '</div>' +
-          '<div class="score-track">' +
-            '<div class="score-fill" id="score-bar" style="width:0%;background:' + fColor + ';box-shadow:0 0 10px ' + fColor + '99;"></div>' +
-          '</div>' +
-          '<p class="friction-verdict">' + fLabel + '</p>' +
-          '<p class="friction-msg">' + fMsg + '</p>' +
-          cwvRow +
-        '</div>' +
-        '<div class="a-panel alt">' +
-          '<p class="panel-label">Revenue Model &mdash; Exposure Breakdown</p>' +
-          '<div class="rev-row"><div class="rev-icon">📉</div><div>' +
-            '<p class="rev-lbl">Performance Tax</p>' +
-            '<p class="rev-detail">LCP &gt; 2.5s adds a 15% revenue penalty per Google research. Every second of load delay compounds abandonment.</p>' +
-          '</div></div>' +
-          '<div class="rev-row"><div class="rev-icon">🧠</div><div>' +
-            '<p class="rev-lbl">Cognitive Overload</p>' +
-            '<p class="rev-detail">INP &gt; 200ms creates a 10% revenue drag. Sluggish interactions break decision momentum at the critical moment.</p>' +
-          '</div></div>' +
-          '<div class="rev-row"><div class="rev-icon">⚠️</div><div>' +
-            '<p class="rev-lbl">Compounding Exposure</p>' +
-            '<p class="rev-detail" id="loss-msg">' + lossMsg + '</p>' +
-          '</div></div>' +
-        '</div>' +
-      '</div>' +
+      const bizNames = [
+        'Apex Commerce', 'NordVault', 'Stellarpath', 'Quorum Labs',
+        'Meridian Co.', 'Ironclad HQ', 'Vantage Digital', 'Orin & Co.',
+        'Nexa Retail', 'Crestline SaaS', 'Atlas Group', 'Fulcrum Media',
+        'Sable Agency', 'Prism eComm', 'Zenith Brands', 'Orbit Finance',
+        'Cascade Tech', 'Luxe Storefronts', 'Summit IO', 'Helix Shop'
+      ];
 
-      // ACTION PLAN
-      '<div class="action-wrap">' +
-        '<div class="action-head">' +
-          '<p class="section-label">Action Plan &mdash; Recommended Resolution</p>' +
-          '<p class="action-desc">We have identified the critical friction points. Below is the path to stopping the revenue bleed — and exactly what it costs you.</p>' +
-        '</div>' +
-        '<div class="action-body">' +
-          '<div class="price-row"><span class="price-lbl">Professional Agency Audit Fee</span><span class="price-val">$2,000</span></div>' +
-          '<div class="price-row sub"><span class="price-lbl">Agency Partner Subsidy</span><span class="price-val">&minus; $2,000</span></div>' +
-          '<div class="divider"></div>' +
-          '<div class="price-row total"><span class="price-lbl">Your Total Today</span><span class="price-val">$0</span></div>' +
-        '</div>' +
-      '</div>' +
+      const leakAmounts = [
+        '$4,200', '$11,800', '$7,500', '$23,400', '$6,100',
+        '$18,900', '$3,750', '$9,200', '$14,600', '$31,000',
+        '$5,800', '$8,400', '$19,700', '$12,300', '$27,500',
+        '$2,950', '$16,200', '$10,100', '$33,800', '$7,900'
+      ];
 
-      // CTA + COUNTDOWN
-      '<div class="cta-wrap">' +
-        '<div class="cta-inner">' +
-          '<a href="mailto:hello@qaseem.pk?subject=Execute%20My%20Free%205-Minute%20Friction%20Fix&body=I%20ran%20the%20revenue%20audit%20and%20want%20to%20execute%20the%20free%205-minute%20friction%20fix." class="cta-btn">Execute 5-Minute Friction Fix &rarr;</a>' +
-          '<p class="cta-sub">No commitment &nbsp;&middot;&nbsp; No sales call &nbsp;&middot;&nbsp; One real fix delivered in 5 minutes</p>' +
-        '</div>' +
-        '<div class="cd-footer">' +
-          '<span class="cd-lbl">Offer expires in</span>' +
-          '<span class="cd-timer" id="offer-countdown">48:00:00</span>' +
-        '</div>' +
-      '</div>';
+      const statuses = ['Intervened', 'Patch Deployed', 'Leak Sealed', 'Fix Applied'];
 
-    document.getElementById('audit-root').innerHTML = html;
+      let bizIndex = Math.floor(Math.random() * bizNames.length);
+      let leakIndex = Math.floor(Math.random() * leakAmounts.length);
 
-    // ── Animate score bar ─────────────────────────────────────────────────────
-    requestAnimationFrame(function () {
-      requestAnimationFrame(function () {
-        var bar = document.getElementById('score-bar');
-        if (bar) bar.style.width = fScore + '%';
-      });
-    });
+      function nowStr() {
+        const d = new Date();
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        const ss = String(d.getSeconds()).padStart(2, '0');
+        return hh + ':' + mm + ':' + ss;
+      }
 
-    // ── 48-hour countdown ─────────────────────────────────────────────────────
-    var OFFER_KEY = 'offerStart_' + btoa(siteUrl).slice(0, 12);
-    var startTs   = parseInt(sessionStorage.getItem(OFFER_KEY) || '0', 10);
-    if (!startTs) {
-      startTs = Date.now();
-      sessionStorage.setItem(OFFER_KEY, String(startTs));
-    }
-    var FORTY_EIGHT_H = 48 * 60 * 60 * 1000;
+      function addEntry() {
+        const biz    = bizNames[bizIndex % bizNames.length];
+        const leak   = leakAmounts[leakIndex % leakAmounts.length];
+        const status = statuses[totalAudits % statuses.length];
+        bizIndex++; leakIndex++;
 
-    function tick() {
-      var remaining = Math.max(0, FORTY_EIGHT_H - (Date.now() - startTs));
-      var h = Math.floor(remaining / 3_600_000);
-      var m = Math.floor((remaining % 3_600_000) / 60_000);
-      var s = Math.floor((remaining % 60_000) / 1_000);
-      var pad = function (n) { return String(n).padStart(2, '0'); };
-      var el  = document.getElementById('offer-countdown');
-      if (el) el.textContent = pad(h) + ':' + pad(m) + ':' + pad(s);
-      if (remaining > 0) setTimeout(tick, 1_000);
-    }
-    tick();
-  }());
+        const entry = document.createElement('div');
+        entry.className = 'activity-entry';
+        entry.innerHTML =
+          '<span class="ae-time">' + nowStr() + '</span>' +
+          '<span class="ae-label">Audit Complete</span>' +
+          '<span>' +
+            '<span class="ae-biz">' + biz + '</span>' +
+            '<span class="ae-pipe"> | </span>' +
+            '<span>Leak Detected: <span class="ae-leak">' + leak + '</span></span>' +
+            '<span class="ae-pipe"> | </span>' +
+            '<span>Status: <span class="ae-status">' + status + '</span></span>' +
+          '</span>';
+
+        log.appendChild(entry);
+        totalAudits++;
+        countEl.textContent = totalAudits.toLocaleString() + ' audit' + (totalAudits === 1 ? '' : 's') + ' processed';
+
+        // smooth-scroll to bottom after paint
+        requestAnimationFrame(() => {
+          log.scrollTo({ top: log.scrollHeight, behavior: 'smooth' });
+        });
+
+        // prune entries older than 40 to keep DOM clean
+        while (log.children.length > 40) {
+          log.removeChild(log.firstChild);
+        }
+      }
+
+      // seed with 6 staggered entries before starting the interval
+      for (let i = 0; i < 6; i++) {
+        setTimeout(addEntry, i * 200);
+      }
+      setInterval(addEntry, 2400);
+    })();
+    // ──────────────────────────────────────────────────────────
+
+    // Lead Form Submission
+    document.getElementById('lead-form').onsubmit = async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('lead-email').value;
+      const data = JSON.parse(sessionStorage.getItem('auditData') || '{}');
+      const status = document.getElementById('lead-status');
+
+      status.innerText = "⟩_ TRANSMITTING LEAD DATA...";
+
+      try {
+        const res = await fetch('/outreach', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, siteUrl: data.siteUrl, leakAmount: data.dailyLoss })
+        });
+        const result = await res.json();
+        if (result.success) {
+          status.innerText = "⟩_ SUCCESS. REPAIR GUIDE TRANSMITTED.";
+          setTimeout(() => toggleModal(false), 2000);
+        } else {
+          status.innerText = "⟩_ ERROR: " + result.error;
+        }
+      } catch (err) {
+        status.innerText = "⟩_ TRANSMISSION FAILED.";
+      }
+    };
   </script>
-
 </body>
 </html>

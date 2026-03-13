@@ -1,72 +1,29 @@
-'use strict';
+// File: utils/leak_calc.js
 /**
- * leak_calc.js — Loss Aversion Revenue Leak Formula
- *
- * Formula:
- *   $Leak = (Traffic × Conversion × AOV) × (PenaltyLCP + PenaltyINP)
- *
- * Penalties:
- *   PenaltyLCP = 0.15  if LCP > 2.5s  (Largest Contentful Paint threshold)
- *   PenaltyINP = 0.10  if INP > 200ms (Interaction to Next Paint threshold)
- *
- * Defaults (based on typical SMB baseline):
- *   Traffic    = 3,000 monthly visitors
- *   Conversion = 2% (0.02)
- *   AOV        = $500 average order / service value
- *
- * @example
- *   const { calculateLeak } = require('./utils/leak_calc');
- *   calculateLeak({ lcp: 3.0, inp: 250 });
- *   // → { annualLeak: 90000, monthlyExposure: 7500, dailyLoss: 250,
- *   //     penaltyLCP: 0.15, penaltyINP: 0.10 }
+ * Friction-Slayer Revenue Leak Calculator
+ * Psychological Trigger: Loss Aversion
  */
+exports.calculateLeak = (metrics) => {
+    const traffic = metrics.traffic || 3000; // Average monthly traffic for local businesses
+    const aov = 500;                         // Average Order Value (e.g., one Dental implant/Lawyer consult)
+    const convBase = 0.02;                   // 2% standard conversion rate baseline
+    
+    // Baseline monthly revenue without technical friction
+    const baselineMonthlyRevenue = traffic * convBase * aov;
 
-const DEFAULT_TRAFFIC    = 3_000;   // monthly visitors
-const DEFAULT_CONVERSION = 0.02;    // 2% baseline CVR
-const DEFAULT_AOV        = 500;     // average order value ($)
+    // Penalties: LCP > 2.5s (15% revenue drop), INP > 200ms (10% revenue drop)
+    // If metrics are missing, assume "Bleeding" state for the outreach hook
+    const penaltyLCP = (metrics.lcp > 2.5 || metrics.lcp === null) ? 0.15 : 0;
+    const penaltyINP = (metrics.inp > 200 || metrics.inp === null) ? 0.10 : 0;
 
-const THRESHOLD_LCP = 2.5;   // seconds
-const THRESHOLD_INP = 200;   // milliseconds
+    const monthlyExposure = baselineMonthlyRevenue * (penaltyLCP + penaltyINP);
+    const annualLeak = monthlyExposure * 12;
 
-const PENALTY_LCP = 0.15;
-const PENALTY_INP = 0.10;
-
-/**
- * Calculate projected revenue leak based on Core Web Vitals.
- *
- * @param {object} metrics
- * @param {number}  metrics.lcp      - Largest Contentful Paint in seconds
- * @param {number}  metrics.inp      - Interaction to Next Paint in milliseconds
- * @param {number} [metrics.traffic] - Monthly visitors (default: 3,000)
- * @param {number} [metrics.aov]     - Average order value in $ (default: 500)
- * @returns {{ annualLeak: number, monthlyExposure: number, dailyLoss: number,
- *             penaltyLCP: number, penaltyINP: number }}
- */
-function calculateLeak(metrics) {
-  const { lcp, inp } = metrics;
-  const traffic = metrics.traffic ?? DEFAULT_TRAFFIC;
-  const aov     = metrics.aov     ?? DEFAULT_AOV;
-
-  const penaltyLCP = lcp > THRESHOLD_LCP ? PENALTY_LCP : 0;
-  const penaltyINP = inp > THRESHOLD_INP ? PENALTY_INP : 0;
-
-  const totalPenalty = penaltyLCP + penaltyINP;
-
-  // Base monthly revenue at full conversion
-  const baseMonthly = traffic * DEFAULT_CONVERSION * aov;
-
-  // Monthly exposure = how much of that baseline is lost to friction
-  const monthlyExposure = Math.round(baseMonthly * totalPenalty);
-  const annualLeak      = monthlyExposure * 12;
-  const dailyLoss       = Math.round(monthlyExposure / 30);
-
-  return {
-    annualLeak,
-    monthlyExposure,
-    dailyLoss,
-    penaltyLCP,
-    penaltyINP,
-  };
-}
-
-module.exports = { calculateLeak };
+    return {
+        annualLeak: Math.round(annualLeak).toLocaleString(),
+        monthlyExposure: Math.round(monthlyExposure).toLocaleString(),
+        dailyLoss: (monthlyExposure / 30).toFixed(2),
+        hicksScore: (metrics.elements || 0) > 50 ? "High Friction" : "Optimized",
+        isVulnerable: (penaltyLCP + penaltyINP) > 0
+    };
+};
