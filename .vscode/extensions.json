@@ -1,12 +1,12 @@
 {
     "recommendations": [
         "google.geminicodeassist",
-        "github.copilot-chat",
         "github.remotehub",
         "github.vscode-github-actions",
         "github.vscode-pull-request-github",
         "ms-vscode.remote-repositories",
         "github.codespaces",
-        "github.github-vscode-theme"
+        "github.github-vscode-theme",
+        "github.copilot-chat"
     ]
 }

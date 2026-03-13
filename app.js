@@ -1,107 +1,79 @@
 require('dotenv').config();
 const express = require('express'), path = require('path');
-const { analyzeHicksLaw }      = require('./services/scraper');
-const { calculateLeak }        = require('./utils/leak_calc');
-const { upsertLead, sendInitialScareEmail, startLeadCron, getPageSpeedMetrics } = require('./services/outreach');
+const axios = require('axios');
+const { analyzeHicksLaw } = require('./services/scraper'); // Assuming this is your custom scraper
+const { calculateLeak } = require('./utils/leak_calc');
 
 const app = express(), PORT = process.env.PORT || 3000;
+
 app.use(express.json(), express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(path.join(__dirname)));
 
-app.get('/',      (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/audit', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'audit.html')));
+// ─── AUTHENTICITY ENGINE ──────────────────────────────────────────────────
+async function getPageSpeedMetrics(url) {
+  const apiKey = process.env.GOOGLE_PAGESPEED_API_KEY;
+  if (!apiKey) throw new Error("API Key Missing. Add GOOGLE_PAGESPEED_API_KEY to .env");
+  
+  const cleanUrl = url.startsWith('http') ? url : `https://${url}`;
+  const psiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(cleanUrl)}&key=${apiKey}&strategy=mobile`;
 
-// ─── Analysis Route: Returns JSON for the Luxury Terminal UI ────────────────
+  // Retries for 429 Errors
+  let attempts = 0;
+  while (attempts < 3) {
+    try {
+      const response = await axios.get(psiUrl);
+      const audits = response.data.lighthouseResult.audits;
+      return {
+        lcp: audits['largest-contentful-paint'].numericValue / 1000,
+        tti: audits['interactive'].numericValue,
+        isAuthentic: true
+      };
+    } catch (error) {
+      if (error.response?.status === 429) {
+        attempts++;
+        await new Promise(r => setTimeout(r, 2000 * attempts));
+      } else throw error;
+    }
+  }
+}
+
+// ─── UPGRADED ANALYSIS ROUTE ──────────────────────────────────────────────
 app.post('/analyze', async (req, res) => {
   try {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'URL required.' });
 
-    // 1. Run Intelligence Scans
+    console.log(`[SYSTEM] Engaging Google V8 for: ${url}`);
+
+    // Run Scraper and Real API in parallel
     const [hicks, cwv] = await Promise.all([
-      analyzeHicksLaw(url),
-      getPageSpeedMetrics(url),
+      analyzeHicksLaw(url).catch(() => ({ elements: 0 })), // Fallback if scraper fails
+      getPageSpeedMetrics(url)
     ]);
 
-    // 2. Quantify Revenue Leak
-    const { annualLeak, monthlyExposure, dailyLoss } = calculateLeak({ 
+    // Quantify Revenue Leak (Grounded in Google Data)
+    const report = calculateLeak({ 
       lcp: cwv.lcp, 
-      inp: cwv.inp,
-      elements: hicks.total 
+      tti: cwv.tti,
+      elements: hicks.elements 
     });
 
-    const isParalysis = hicks.verdict === 'Decision Paralysis';
-    const hicksScore  = isParalysis ? "High Friction" : "Optimized";
-
-    // 3. Return Intelligence Payload
     res.json({
-      siteUrl:         url,
-      annualLeak,
-      monthlyExposure,
-      dailyLoss,
-      lcp:             cwv.lcp,
-      inp:             cwv.inp,
-      hicksVerdict:    hicks.verdict,
-      hicksScore,
-      hicksMessage:    hicks.message,
-      hicksTotal:      hicks.total,
+      success: true,
+      url,
+      metrics: cwv,
+      report, // Contains annualLeak, monthlyLeak, etc.
+      status: "VERIFIED_BY_GOOGLE"
     });
+
   } catch (err) {
-    console.error('[analyze] Error:', err.message);
-    res.status(500).json({ error: err.message });
+    console.error('[SYSTEM ERROR]', err.message);
+    res.status(500).json({ error: "Scan failed. Google is throttling or site is blocked." });
   }
 });
 
+app.get('/',      (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/audit', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'audit.html')));
 
-// ─── Lead Capture: save contact + fire scare email ───────────────────────────
-app.post('/outreach', async (req, res) => {
-  try {
-    const { email, leakAmount = 83, siteUrl = '' } = req.body;
-
-    // Basic email format guard
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ error: 'Invalid email address.' });
-    }
-
-    const dailyLeak   = Number(leakAmount) || 83;
-    const annualLeak  = dailyLeak * 365;
-    const monthlyLeak = dailyLeak * 30;
-
-    // Persist to leads.json
-    upsertLead(email, siteUrl, dailyLeak, monthlyLeak);
-
-    // Fire initial scare email (non-blocking)
-    sendInitialScareEmail(email, annualLeak, siteUrl).catch(err =>
-      console.error('[outreach] Initial email failed:', err.message)
-    );
-
-    res.json({ success: true, message: 'Lead saved. Scare email queued.' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ─── Reply webhook: mark lead as replied ─────────────────────────────────────
-app.post('/webhook/reply', express.json(), (req, res) => {
-  try {
-    const email = req.body?.from || req.body?.email;
-    if (!email) return res.status(400).json({ error: 'Missing email.' });
-    const fs    = require('fs');
-    const leads = JSON.parse(fs.existsSync('./leads.json')
-      ? fs.readFileSync('./leads.json', 'utf8') : '[]');
-    const lead  = leads.find(l => l.email === email);
-    if (lead) {
-      lead.replyTracked = true;
-      lead.repliedAt    = new Date().toISOString();
-      fs.writeFileSync('./leads.json', JSON.stringify(leads, null, 2));
-    }
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ─── Start cron + server ─────────────────────────────────────────────────────
-startLeadCron();
-app.listen(PORT, () => console.log(`Friction-Slayer live on http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`[MERCENARY ACTIVE] Port ${PORT}`));

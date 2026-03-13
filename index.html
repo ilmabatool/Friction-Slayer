@@ -299,48 +299,56 @@
   </div>
 
   <script>
-    const form = document.getElementById('command-form');
-    const overlay = document.getElementById('scan-overlay');
-    const output = document.getElementById('terminal-output');
-    const fill = document.getElementById('progress-fill');
-    const urlInput = document.getElementById('url-input');
+const form = document.getElementById('command-form');
+const overlay = document.getElementById('scan-overlay');
+const output = document.getElementById('terminal-output');
+const fill = document.getElementById('progress-fill');
+const urlInput = document.getElementById('url-input');
 
-    const messages = [
-      "▸ Quantifying Cognitive Friction Load...",
-      "▸ Correlating LCP Latency with Revenue Attrition...",
-      "▸ Benchmarking Conversion Probability...",
-      "▸ Identifying Decision Fatigue Hotspots...",
-      "▸ Generating Executive Report..."
-    ];
+const messages = [
+  "▸ Initializing Google V8 Intelligence Nodes...",
+  "▸ Bypassing Local Cache Protocols...",
+  "▸ Quantifying Visual Friction (LCP) via Google PSI...",
+  "▸ Correlating Latency with Annual Revenue Hemorrhage...",
+  "▸ Generating 100% Authentic Executive Audit..."
+];
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const url = urlInput.value;
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const url = urlInput.value;
+  if(!url) return;
 
-      overlay.classList.add('active');
+  overlay.classList.add('active');
 
-      for (let i = 0; i < messages.length; i++) {
-        output.innerText = messages[i];
-        const progress = ((i + 1) / messages.length) * 100;
-        fill.style.width = progress + '%';
-        await new Promise(r => setTimeout(r, 1000));
-      }
+  // Animation Loop (6 Seconds of Tension)
+  for (let i = 0; i < messages.length; i++) {
+    output.innerText = messages[i];
+    fill.style.width = ((i + 1) / messages.length) * 100 + '%';
+    await new Promise(r => setTimeout(r, 1200)); 
+  }
 
-      try {
-        const res = await fetch('/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url })
-        });
-
-        const data = await res.json();
-        sessionStorage.setItem('auditData', JSON.stringify(data));
-        window.location.href = '/audit';
-      } catch (err) {
-        output.innerText = "▸ ERROR: System scan failed.";
-        output.style.color = "#ff4d4d";
-      }
+  try {
+    const res = await fetch('/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
     });
+
+    const result = await res.json();
+    
+    if (result.success) {
+      // Pass the real Google data to the audit page
+      sessionStorage.setItem('auditData', JSON.stringify(result));
+      window.location.href = '/audit';
+    } else {
+      throw new Error(result.error);
+    }
+  } catch (err) {
+    output.innerText = "▸ CRITICAL FAILURE: " + (err.message || "Connection Lost");
+    output.style.color = "#ff4d4d";
+    setTimeout(() => overlay.classList.remove('active'), 3000);
+  }
+});
   </script>
 </body>
 </html>

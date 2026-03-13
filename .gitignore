@@ -1,4 +1,11 @@
-node_modules/
-.venv/
-__pycache__/
+# Security: Sensitive Environment Variables
 .env
+.env.local
+
+# Dependency folders
+node_modules/
+dist/
+
+# System logs & local databases
+npm-debug.log*
+leads.json
