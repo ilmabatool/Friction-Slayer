@@ -6,14 +6,28 @@ require('dotenv').config();
  * This is the foundation of the 'Truth at all costs' directive.
  */
 async function getAuthenticMetrics(url) {
-  const apiKey = process.env.GOOGLE_PAGESPEED_API_KEY;AIzaSyCs0N4YDTZJewo5MfytDuCQD4g5iYnjQ-Q
+  const apiKey = (process.env.GOOGLE_PAGESPEED_API_KEY || process.env.PAGESPEED_API_KEY || '')
+    .trim()
+    .replace(/;$/, '');
+  if (!apiKey) {
+    throw new Error('Google API key missing. Set GOOGLE_PAGESPEED_API_KEY in .env');
+  }
+
   // Ensure the URL is clean
   const cleanUrl = url.startsWith('http') ? url : `https://${url}`;
-  const psiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(cleanUrl)}&key=${apiKey}&strategy=mobile`;
+  const params = new URLSearchParams({
+    url: cleanUrl,
+    key: apiKey,
+    strategy: 'mobile'
+  });
+  const psiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?${params.toString()}`;
 
   try {
     const response = await axios.get(psiUrl);
-    const audits = response.data.lighthouseResult.audits;
+    const audits = response.data?.lighthouseResult?.audits;
+    if (!audits?.['largest-contentful-paint'] || !audits?.['interactive']) {
+      throw new Error('[Google PSI] Response missing expected Lighthouse metrics.');
+    }
     
     // Key Performance Indicators (KPIs)
     const lcp = audits['largest-contentful-paint'].numericValue / 1000; // in seconds
@@ -28,8 +42,15 @@ async function getAuthenticMetrics(url) {
       timestamp: new Date().toISOString()
     };
   } catch (error) {
-    console.error("CRITICAL ERROR: Authenticity Pipeline Failure.", error.message);
-    throw new Error("Could not verify metrics. Check API Key and URL.");
+    const status = error.response?.status;
+    const apiMessage = error.response?.data?.error?.message || error.message;
+    const apiReason = error.response?.data?.error?.errors?.[0]?.reason;
+    const detail = apiReason
+      ? `[Google PSI ${status || 'UNKNOWN'}] ${apiMessage} (reason: ${apiReason})`
+      : `[Google PSI ${status || 'UNKNOWN'}] ${apiMessage}`;
+
+    console.error('CRITICAL ERROR: Authenticity Pipeline Failure.', detail);
+    throw new Error(detail);
   }
 }
 

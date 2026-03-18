@@ -1,90 +1,924 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Friction Audit | CONFIDENTIAL</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        :root { --gold: #FFD700; --bg: #050505; --card: rgba(255,255,255,0.03); }
-        body { background: var(--bg); color: #fff; font-family: 'Inter', sans-serif; display: flex; flex-direction: column; align-items: center; padding: 50px; }
-        .dashboard { max-width: 1000px; width: 100%; border: 1px solid #1a1a1a; padding: 40px; backdrop-filter: blur(20px); border-radius: 12px; background: var(--card); }
-        .leak-counter { font-size: 64px; font-weight: 800; color: #ff3333; margin: 20px 0; text-shadow: 0 0 20px rgba(255,51,51,0.3); }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 40px; }
-        .pricing { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 60px; width: 100%; }
-        .price-card { border: 1px solid #222; padding: 30px; border-radius: 8px; text-align: center; transition: 0.3s; }
-        .price-card.featured { border-color: var(--gold); transform: scale(1.05); background: rgba(255,215,0,0.05); }
-        .gold-text { color: var(--gold); }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forensic Audit Report | Friction-Slayer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:        #080810;
+      --surface:   #0d0d1a;
+      --border:    rgba(255,255,255,0.07);
+      --red:       #ff3333;
+      --red-dim:   rgba(255,51,51,0.12);
+      --green:     #00ff88;
+      --green-dim: rgba(0,255,136,0.1);
+      --gold:      #FFD700;
+      --gold-dim:  rgba(255,215,0,0.08);
+      --cyan:      #00d4ff;
+      --text-muted:#666;
+      --mono:      'JetBrains Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      padding: 40px 24px 80px;
+    }
+
+    /* ── Scanline overlay ─────────────────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.03) 2px,
+        rgba(0,0,0,0.03) 4px
+      );
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    .page-wrapper {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* ── Hero ─────────────────────────────────────────────────────────────── */
+    .hero {
+      text-align: center;
+      padding: 40px 0 48px;
+      opacity: 0;
+      animation: fade-up 0.6s ease 0.1s forwards;
+    }
+    .hero-badge {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      color: var(--red);
+      border: 1px solid rgba(255,51,51,0.3);
+      border-radius: 4px;
+      padding: 4px 12px;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+      background: var(--red-dim);
+    }
+    .hero-title {
+      font-size: clamp(28px, 5vw, 52px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    .hero-url {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 36px;
+      word-break: break-all;
+    }
+    .hero-url span { color: var(--cyan); }
+
+    /* ── Revenue leak counter ─────────────────────────────────────────────── */
+    .leak-block {
+      display: inline-block;
+      padding: 28px 48px;
+      background: var(--red-dim);
+      border: 1px solid rgba(255,51,51,0.25);
+      border-radius: 16px;
+      margin-bottom: 12px;
+    }
+    .leak-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      color: rgba(255,80,80,0.7);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .leak-amount {
+      font-size: clamp(48px, 8vw, 80px);
+      font-weight: 800;
+      color: var(--red);
+      text-shadow: 0 0 40px rgba(255,51,51,0.4);
+      font-family: var(--mono);
+      letter-spacing: -0.03em;
+    }
+    .leak-sub {
+      font-size: 13px;
+      color: rgba(255,80,80,0.55);
+      margin-top: 6px;
+      font-family: var(--mono);
+    }
+
+    /* ── Calibration sliders ──────────────────────────────────────────────── */
+    .calibration {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px 28px;
+      margin: 24px 0 36px;
+      opacity: 0;
+      animation: fade-up 0.6s ease 0.3s forwards;
+    }
+    .calibration-title {
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-family: var(--mono);
+      margin-bottom: 20px;
+    }
+    .sliders-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+    }
+    @media (max-width: 600px) { .sliders-row { grid-template-columns: 1fr; } }
+    .slider-group label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 13px;
+      color: #aaa;
+      margin-bottom: 10px;
+    }
+    .slider-val {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--gold);
+      font-weight: 600;
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 3px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--gold);
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(255,215,0,0.5);
+    }
+
+    /* ── Bento grid ───────────────────────────────────────────────────────── */
+    .bento {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      opacity: 0;
+    }
+    .card-span-6  { grid-column: span 6; }
+    .card-span-4  { grid-column: span 4; }
+    .card-span-3  { grid-column: span 3; }
+    .card-span-12 { grid-column: span 12; }
+    @media (max-width: 900px) {
+      .card-span-6, .card-span-4, .card-span-3 { grid-column: span 12; }
+    }
+    @media (min-width: 901px) and (max-width: 1060px) {
+      .card-span-4 { grid-column: span 6; }
+      .card-span-3 { grid-column: span 6; }
+    }
+
+    .card-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 18px;
+      letter-spacing: -0.01em;
+    }
+
+    /* ── Progress bar ─────────────────────────────────────────────────────── */
+    .metric-bar-row {
+      margin-bottom: 18px;
+    }
+    .metric-bar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+    .metric-name { font-size: 13px; color: #bbb; }
+    .metric-score {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .bar-track {
+      height: 6px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 6px;
+      transition: width 1.2s cubic-bezier(0.22,1,0.36,1);
+    }
+    .bar-red    { background: linear-gradient(90deg, #ff3333, #ff6b6b); }
+    .bar-yellow { background: linear-gradient(90deg, #FFD700, #ffe566); }
+    .bar-green  { background: linear-gradient(90deg, #00ff88, #00e67a); }
+    .bar-cyan   { background: linear-gradient(90deg, #00d4ff, #33e0ff); }
+    .bar-orange { background: linear-gradient(90deg, #ff8c00, #ffab00); }
+
+    /* ── SEO checklist ────────────────────────────────────────────────────── */
+    .check-list { list-style: none; }
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 13px;
+    }
+    .check-item:last-child { border-bottom: none; }
+    .check-icon {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      margin-top: 1px;
+    }
+    .icon-pass  { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,255,136,0.3); }
+    .icon-fail  { background: var(--red-dim);   color: var(--red);   border: 1px solid rgba(255,51,51,0.3); }
+    .icon-warn  { background: var(--gold-dim);  color: var(--gold);  border: 1px solid rgba(255,215,0,0.3); }
+    .check-text { color: #ccc; line-height: 1.4; }
+    .check-detail { display: block; color: var(--text-muted); font-size: 11px; margin-top: 2px; font-family: var(--mono); }
+
+    /* ── Hick's Law ───────────────────────────────────────────────────────── */
+    .hicks-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .hicks-box {
+      flex: 1;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+    }
+    .hicks-count {
+      font-family: var(--mono);
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .hicks-sub { font-size: 11px; color: var(--text-muted); }
+    .verdict-badge {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+    }
+    .badge-danger { background: var(--red-dim);   color: var(--red);   border: 1px solid rgba(255,51,51,0.3); }
+    .badge-ok     { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,255,136,0.25); }
+
+    /* ── Tech stack tags ──────────────────────────────────────────────────── */
+    .tag-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .tag {
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(0,212,255,0.2);
+      background: rgba(0,212,255,0.06);
+      color: var(--cyan);
+    }
+    .tag-none { color: var(--text-muted); font-size: 13px; }
+
+    /* ── Action console ───────────────────────────────────────────────────── */
+    .action-console {
+      background: var(--surface);
+      border: 1px solid rgba(255,51,51,0.2);
+      border-radius: 14px;
+      padding: 24px;
+      opacity: 0;
+      animation: fade-up 0.6s ease 0.8s forwards;
+    }
+    .console-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .console-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 8px rgba(255,51,51,0.6);
+      animation: blink 1s ease infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1}50%{opacity:0.2} }
+    .console-title { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
+
+    .failure-list { list-style: none; }
+    .failure-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .failure-item:last-child { border-bottom: none; }
+    .failure-priority {
+      flex-shrink: 0;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--red);
+      border: 1px solid rgba(255,51,51,0.3);
+      border-radius: 4px;
+      padding: 3px 6px;
+      min-width: 30px;
+      text-align: center;
+      background: var(--red-dim);
+      margin-top: 1px;
+    }
+    .failure-body { flex: 1; }
+    .failure-issue { font-size: 14px; font-weight: 600; color: #eee; margin-bottom: 4px; }
+    .failure-detail { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+    .failure-loss {
+      flex-shrink: 0;
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--red);
+      text-align: right;
+    }
+    .failure-loss span { display: block; font-size: 10px; color: var(--text-muted); font-weight: 400; }
+
+    .no-failures {
+      text-align: center;
+      padding: 30px;
+      color: var(--green);
+      font-family: var(--mono);
+      font-size: 14px;
+    }
+
+    /* ── Stat pill ────────────────────────────────────────────────────────── */
+    .stat-row {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin: 6px 0 0;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .stat-row b { color: #ddd; }
+
+    /* ── Blocked notice ───────────────────────────────────────────────────── */
+    .blocked-notice {
+      background: var(--gold-dim);
+      border: 1px solid rgba(255,215,0,0.2);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 12px;
+      color: var(--gold);
+      font-family: var(--mono);
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    /* ── Animations ───────────────────────────────────────────────────────── */
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .stagger-1  { animation: fade-up 0.55s ease 0.30s forwards; }
+    .stagger-2  { animation: fade-up 0.55s ease 0.42s forwards; }
+    .stagger-3  { animation: fade-up 0.55s ease 0.54s forwards; }
+    .stagger-4  { animation: fade-up 0.55s ease 0.66s forwards; }
+    .stagger-5  { animation: fade-up 0.55s ease 0.78s forwards; }
+    .stagger-6  { animation: fade-up 0.55s ease 0.90s forwards; }
+
+    /* ── Loading / redirect state ─────────────────────────────────────────── */
+    #loading-screen {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      z-index: 100;
+      font-family: var(--mono);
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    .spin {
+      width: 32px; height: 32px;
+      border: 2px solid rgba(255,255,255,0.05);
+      border-top-color: var(--red);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #main-content { display: none; }
+
+    /* ── Section separator ────────────────────────────────────────────────── */
+    .section-sep {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      color: rgba(255,255,255,0.12);
+      text-transform: uppercase;
+      margin: 28px 0 16px;
+    }
+  </style>
 </head>
 <body>
-    <div class="dashboard">
-        <header>
-            <span class="gold-text">SYSTEM STATUS: ANALYSIS VERIFIED BY GOOGLE V8</span>
-            <h1>Executive Revenue Briefing</h1>
-            <p>Target: <span id="target-url">Loading...</span></p>
-        </header>
 
-        <div class="leak-counter">$<span id="annual-leak">0</span></div>
-        <p>IDENTIFIED ANNUAL REVENUE HEMORRHAGE</p>
+  <!-- Loading state -->
+  <div id="loading-screen">
+    <div class="spin"></div>
+    <span>LOADING FORENSIC REPORT…</span>
+  </div>
 
-        <div class="grid">
-            <canvas id="leakChart"></canvas>
-            <div class="metrics">
-                <h3>Technical Friction Profile</h3>
-                <p>LCP (Visual Load): <span id="lcp-val" class="gold-text">--</span>s</p>
-                <p>TTI (Interaction): <span id="tti-val" class="gold-text">--</span>ms</p>
-                <hr style="border: 0; border-top: 1px solid #222; margin: 20px 0;">
-                <p style="font-size: 12px; color: #666;">Source: Google PageSpeed Insights API</p>
-            </div>
-        </div>
+  <!-- Main content -->
+  <div id="main-content" class="page-wrapper">
 
-        <div class="pricing">
-            <div class="price-card">
-                <h3>The Patch</h3>
-                <p class="gold-text">$150</p>
-                <p>Basic Speed Optimization</p>
-            </div>
-            <div class="price-card featured">
-                <h3>Strategic Fix</h3>
-                <p class="gold-text">$600</p>
-                <p>Full Revenue Recovery Suite</p>
-                <button style="background: var(--gold); border: 0; padding: 10px 20px; margin-top: 10px; cursor: pointer;">DEPLOY NOW</button>
-            </div>
-            <div class="price-card">
-                <h3>Strategic Partnership</h3>
-                <p class="gold-text">$4,500/mo</p>
-                <p>Monthly Growth Mercenary</p>
-            </div>
-        </div>
+    <!-- Hero -->
+    <div class="hero">
+      <div class="hero-badge">⬤ AUDIT COMPLETE — FORENSIC GRADE</div>
+      <h1 class="hero-title">Revenue Leak Identified</h1>
+      <p class="hero-url">Target: <span id="target-url">—</span></p>
+      <div id="blocked-notice" class="blocked-notice">
+        ⚠ Site returned a 403/429 — static analysis may be partial. Performance data from Google is accurate.
+      </div>
+      <div class="leak-block">
+        <div class="leak-label">Estimated Annual Revenue Leak</div>
+        <div class="leak-amount">$<span id="leak-counter">0</span></div>
+        <div class="leak-sub" id="monthly-loss-label">—/month · based on your traffic &amp; AOV</div>
+      </div>
+      <div class="stat-row">
+        <span>Daily: <b id="daily-stat">—</b></span>
+        <span>Monthly: <b id="monthly-stat">—</b></span>
+        <span>Penalty: <b id="penalty-stat">—</b></span>
+      </div>
     </div>
 
-    <script>
-        // AUTHENTIC DATA LOADING
-        function initAudit(data) {
-            document.getElementById('annual-leak').innerText = data.annualLoss.toLocaleString();
-            document.getElementById('lcp-val').innerText = data.lcp;
-            document.getElementById('tti-val').innerText = data.tti;
-            
-            const ctx = document.getElementById('leakChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Visual Friction', 'Interactive Friction'],
-                    datasets: [{
-                        data: [data.lcpLoss, data.ttiLoss],
-                        backgroundColor: ['#ff3333', '#FFD700'],
-                        borderWidth: 0
-                    }]
-                },
-                options: { plugins: { legend: { display: false } } }
-            });
-        }
+    <!-- Calibration sliders -->
+    <div class="calibration">
+      <div class="calibration-title">▸ Accuracy Calibration — Enter Your Real Numbers</div>
+      <div class="sliders-row">
+        <div class="slider-group">
+          <label>
+            Monthly Visitors
+            <span class="slider-val" id="traffic-display">5,000</span>
+          </label>
+          <input type="range" id="traffic-slider" min="500" max="100000" step="500" value="5000">
+        </div>
+        <div class="slider-group">
+          <label>
+            Avg. Order Value
+            <span class="slider-val" id="aov-display">$50</span>
+          </label>
+          <input type="range" id="aov-slider" min="10" max="2000" step="10" value="50">
+        </div>
+      </div>
+    </div>
 
-        // Simulate receiving data from the backend
-        // In your real app, this will be fetched from an API route
-        const mockData = { annualLoss: 42300, lcp: 4.2, tti: 3800, lcpLoss: 25380, ttiLoss: 16920 };
-        initAudit(mockData);
-    </script>
+    <!-- Bento grid -->
+    <div class="section-sep">▸ Forensic Breakdown</div>
+
+    <div class="bento">
+
+      <!-- Speed / Core Web Vitals -->
+      <div class="card card-span-6 stagger-1">
+        <div class="card-label">01 / Performance</div>
+        <div class="card-title">Core Web Vitals</div>
+        <div class="metric-bar-row">
+          <div class="metric-bar-header">
+            <span class="metric-name">LCP — Largest Contentful Paint</span>
+            <span class="metric-score" id="lcp-label" style="color:var(--red)">—s</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill bar-red" id="lcp-bar"></div></div>
+        </div>
+        <div class="metric-bar-row">
+          <div class="metric-bar-header">
+            <span class="metric-name">TTI — Time to Interactive</span>
+            <span class="metric-score" id="tti-label" style="color:var(--gold)">—ms</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill bar-yellow" id="tti-bar"></div></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:8px;font-family:var(--mono)">
+          Source: Google PageSpeed Insights API (Mobile)
+        </div>
+      </div>
+
+      <!-- Neuromarketing -->
+      <div class="card card-span-6 stagger-2">
+        <div class="card-label">02 / Neuromarketing</div>
+        <div class="card-title">Psychological Triggers</div>
+        <div class="metric-bar-row">
+          <div class="metric-bar-header">
+            <span class="metric-name">Urgency Signals</span>
+            <span class="metric-score" id="urgency-score" style="color:var(--red)">0</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill bar-red" id="urgency-bar"></div></div>
+        </div>
+        <div class="metric-bar-row">
+          <div class="metric-bar-header">
+            <span class="metric-name">Social Proof &amp; Trust</span>
+            <span class="metric-score" id="social-score" style="color:var(--cyan)">0</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill bar-cyan" id="social-bar"></div></div>
+        </div>
+        <div class="metric-bar-row">
+          <div class="metric-bar-header">
+            <span class="metric-name">Authority Signals</span>
+            <span class="metric-score" id="authority-score" style="color:var(--green)">0</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill bar-green" id="authority-bar"></div></div>
+        </div>
+      </div>
+
+      <!-- SEO Health -->
+      <div class="card card-span-6 stagger-3">
+        <div class="card-label">03 / SEO Health</div>
+        <div class="card-title">On-Page Signals</div>
+        <ul class="check-list" id="seo-checklist">
+          <!-- populated by JS -->
+        </ul>
+      </div>
+
+      <!-- Cognitive Load (Hick's Law) -->
+      <div class="card card-span-6 stagger-4">
+        <div class="card-label">04 / Cognitive Load</div>
+        <div class="card-title">Hick's Law Analysis</div>
+        <div class="hicks-row" id="hicks-row">
+          <div class="hicks-box">
+            <div class="hicks-count" id="hicks-links" style="color:var(--cyan)">—</div>
+            <div class="hicks-sub">Links</div>
+          </div>
+          <div class="hicks-box">
+            <div class="hicks-count" id="hicks-buttons" style="color:var(--gold)">—</div>
+            <div class="hicks-sub">Buttons</div>
+          </div>
+          <div class="hicks-box">
+            <div class="hicks-count" id="hicks-inputs" style="color:var(--green)">—</div>
+            <div class="hicks-sub">Inputs</div>
+          </div>
+          <div class="hicks-box">
+            <div class="hicks-count" id="hicks-total" style="color:var(--red)">—</div>
+            <div class="hicks-sub">Total</div>
+          </div>
+        </div>
+        <div style="margin-bottom:12px">
+          <span class="verdict-badge" id="hicks-verdict">—</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);line-height:1.6">
+          Hick's Law: decision time rises logarithmically with choices.
+          Optimal interactive element count is ≤ 12.
+        </div>
+      </div>
+
+      <!-- Tech Stack -->
+      <div class="card card-span-12 stagger-5">
+        <div class="card-label">05 / Tech Stack</div>
+        <div class="card-title">Detected Technologies</div>
+        <div id="tech-tags" class="tag-list"></div>
+      </div>
+
+    </div>
+
+    <!-- Action Console -->
+    <div class="section-sep">▸ Critical Failures</div>
+    <div class="action-console">
+      <div class="console-header">
+        <div class="console-dot"></div>
+        <div class="console-title">Action Console — Sorted by Revenue Impact</div>
+      </div>
+      <ul class="failure-list" id="failure-list">
+        <!-- populated by JS -->
+      </ul>
+    </div>
+
+  </div><!-- /main-content -->
+
+  <script>
+  (function () {
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
+    function fmt(n)  { return Number(n).toLocaleString(); }
+    function fmtD(n) { return '$' + fmt(n); }
+
+    function countUp(el, target, duration) {
+      const start = performance.now();
+      target = Math.round(target);
+      function step(now) {
+        const t = Math.min((now - start) / duration, 1);
+        const ease = 1 - Math.pow(1 - t, 4);
+        el.textContent = fmt(Math.round(ease * target));
+        if (t < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    function setBar(id, pct) {
+      setTimeout(() => {
+        const el = document.getElementById(id);
+        if (el) el.style.width = Math.min(Math.max(pct, 2), 100) + '%';
+      }, 300);
+    }
+
+    function checkItem(pass, label, detail) {
+      const icon  = pass ? '✓' : '✗';
+      const cls   = pass ? 'icon-pass' : 'icon-fail';
+      return `<li class="check-item">
+        <span class="check-icon ${cls}">${icon}</span>
+        <span class="check-text">${label}<span class="check-detail">${detail}</span></span>
+      </li>`;
+    }
+
+    function warnItem(label, detail) {
+      return `<li class="check-item">
+        <span class="check-icon icon-warn">!</span>
+        <span class="check-text">${label}<span class="check-detail">${detail}</span></span>
+      </li>`;
+    }
+
+    // ── Revenue leak recalculator (mirrors server logic) ────────────────────
+    function recalcLeak(traffic, aov, data) {
+      const lcp  = data.metrics ? data.metrics.lcp  : null;
+      const seo  = data.analysis ? data.analysis.seo : null;
+      const neuro= data.analysis ? data.analysis.neuromarketing : null;
+
+      const convBase = 0.02;
+      const base     = traffic * convBase * aov;
+      let   rate     = 0;
+      const bdown    = [];
+
+      if (lcp === null || lcp === undefined || lcp > 2.5) {
+        rate += 0.15;
+        bdown.push({ issue: 'Slow Page Load (LCP)',
+          detail: `LCP ${lcp ? lcp.toFixed(2)+'s' : 'unknown'} exceeds 2.5 s`,
+          monthlyLoss: Math.round(base * 0.15) });
+      }
+      if (seo && seo.h1_count !== 1) {
+        rate += 0.05;
+        bdown.push({ issue: 'Missing / Duplicate H1 Tag',
+          detail: `${seo.h1_count ?? 0} H1 tag(s) found — should be exactly 1`,
+          monthlyLoss: Math.round(base * 0.05) });
+      }
+      if (seo && !seo.meta_description_exists) {
+        rate += 0.05;
+        bdown.push({ issue: 'Missing Meta Description',
+          detail: 'No meta description reduces organic CTR by ~5 %',
+          monthlyLoss: Math.round(base * 0.05) });
+      }
+      if (neuro && !neuro.social_proof) {
+        rate += 0.10;
+        bdown.push({ issue: 'No Social Proof Signals',
+          detail: 'Missing reviews/testimonials reduce trust conversion by ~10 %',
+          monthlyLoss: Math.round(base * 0.10) });
+      }
+      const monthly = Math.round(base * rate);
+      return {
+        annual:   monthly * 12,
+        monthly,
+        daily:    +(monthly / 30).toFixed(2),
+        rate:     Math.round(rate * 100),
+        breakdown: bdown,
+      };
+    }
+
+    // ── Update Action Console ────────────────────────────────────────────────
+    function renderConsole(breakdown) {
+      const list = document.getElementById('failure-list');
+      if (!breakdown || breakdown.length === 0) {
+        list.innerHTML = '<li class="no-failures">✓ No critical failures detected.</li>';
+        return;
+      }
+      const sorted = [...breakdown].sort((a, b) => b.monthlyLoss - a.monthlyLoss);
+      list.innerHTML = sorted.map((item, i) =>
+        `<li class="failure-item">
+          <span class="failure-priority">P${i + 1}</span>
+          <div class="failure-body">
+            <div class="failure-issue">${item.issue}</div>
+            <div class="failure-detail">${item.detail}</div>
+          </div>
+          <div class="failure-loss">
+            ${fmtD(item.monthlyLoss)}<span>/month</span>
+          </div>
+        </li>`
+      ).join('');
+    }
+
+    // ── Update revenue numbers ───────────────────────────────────────────────
+    let currentAnnual = 0;
+    function updateRevenue(leakData, animate) {
+      document.getElementById('daily-stat').textContent   = fmtD(leakData.daily);
+      document.getElementById('monthly-stat').textContent = fmtD(leakData.monthly);
+      document.getElementById('penalty-stat').textContent = leakData.rate + '% penalty';
+      document.getElementById('monthly-loss-label').textContent =
+        `${fmtD(leakData.monthly)}/month · adjusted to your traffic & AOV`;
+
+      if (animate) {
+        countUp(document.getElementById('leak-counter'), leakData.annual, 1600);
+      } else {
+        countUp(document.getElementById('leak-counter'), leakData.annual, 600);
+      }
+      currentAnnual = leakData.annual;
+      renderConsole(leakData.breakdown);
+    }
+
+    // ── Main init ────────────────────────────────────────────────────────────
+    const raw = sessionStorage.getItem('auditData');
+    if (!raw) {
+      window.location.href = '/';
+      return;
+    }
+
+    let data;
+    try { data = JSON.parse(raw); } catch (e) { window.location.href = '/'; return; }
+
+    // Hide loading, show content
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('main-content').style.display   = 'block';
+
+    // ── Target URL ────────────────────────────────────────────────────────
+    document.getElementById('target-url').textContent = data.url || '—';
+
+    // ── Blocked notice ────────────────────────────────────────────────────
+    if (data.analysis && data.analysis.status === 'BLOCKED') {
+      document.getElementById('blocked-notice').style.display = 'block';
+    }
+
+    // ── Performance bars ─────────────────────────────────────────────────
+    const metrics = data.metrics || {};
+    const lcp = metrics.lcp || 0;
+    const tti = metrics.tti || 0;
+
+    const lcpLabel = document.getElementById('lcp-label');
+    lcpLabel.textContent = lcp ? lcp.toFixed(2) + 's' : 'N/A';
+    const lcpPct = Math.min((lcp / 8) * 100, 100);
+    lcpLabel.style.color = lcp > 4 ? 'var(--red)' : lcp > 2.5 ? 'var(--gold)' : 'var(--green)';
+    setBar('lcp-bar', lcpPct);
+    document.getElementById('lcp-bar').className =
+      'bar-fill ' + (lcp > 4 ? 'bar-red' : lcp > 2.5 ? 'bar-yellow' : 'bar-green');
+
+    const ttiLabel = document.getElementById('tti-label');
+    ttiLabel.textContent = tti ? Math.round(tti) + 'ms' : 'N/A';
+    const ttiPct = Math.min((tti / 10000) * 100, 100);
+    ttiLabel.style.color = tti > 5000 ? 'var(--red)' : tti > 3800 ? 'var(--gold)' : 'var(--green)';
+    setBar('tti-bar', ttiPct);
+    document.getElementById('tti-bar').className =
+      'bar-fill ' + (tti > 5000 ? 'bar-red' : tti > 3800 ? 'bar-yellow' : 'bar-green');
+
+    // ── Neuromarketing bars ───────────────────────────────────────────────
+    const neuro = (data.analysis && data.analysis.neuromarketing) || {};
+    const maxKw = 6;
+
+    const urgCnt  = neuro.urgency_count      || 0;
+    const socCnt  = neuro.social_proof_count || 0;
+    const authCnt = neuro.authority_count    || 0;
+
+    document.getElementById('urgency-score').textContent   = urgCnt  + ' / ' + maxKw;
+    document.getElementById('social-score').textContent    = socCnt  + ' / ' + maxKw;
+    document.getElementById('authority-score').textContent = authCnt + ' / ' + maxKw;
+
+    document.getElementById('urgency-score').style.color   = urgCnt  === 0 ? 'var(--red)' : 'var(--gold)';
+    document.getElementById('social-score').style.color    = socCnt  === 0 ? 'var(--red)' : 'var(--cyan)';
+    document.getElementById('authority-score').style.color = authCnt === 0 ? 'var(--red)' : 'var(--green)';
+
+    setBar('urgency-bar',  (urgCnt  / maxKw) * 100);
+    setBar('social-bar',   (socCnt  / maxKw) * 100);
+    setBar('authority-bar',(authCnt / maxKw) * 100);
+
+    // ── SEO checklist ─────────────────────────────────────────────────────
+    const seo = (data.analysis && data.analysis.seo) || {};
+    let seoHtml = '';
+
+    if (seo.title_exists !== undefined) {
+      seoHtml += checkItem(seo.title_exists,
+        'Title Tag',
+        seo.title_exists
+          ? `${seo.title_length} characters — ${seo.title_length >= 50 && seo.title_length <= 60 ? 'optimal length' : 'aim for 50–60 chars'}`
+          : 'No title tag found');
+    }
+    if (seo.meta_description_exists !== undefined) {
+      seoHtml += checkItem(seo.meta_description_exists,
+        'Meta Description',
+        seo.meta_description_exists
+          ? `${seo.meta_description_length} characters — ${seo.meta_description_length >= 120 && seo.meta_description_length <= 160 ? 'optimal' : 'aim for 120–160 chars'}`
+          : 'Missing — hurts organic CTR');
+    }
+    if (seo.h1_count !== undefined) {
+      const h1Pass = seo.h1_count === 1;
+      const h1Item = h1Pass
+        ? checkItem(true,  'H1 Tag', '1 H1 tag — correct')
+        : seo.h1_count === 0
+          ? checkItem(false, 'H1 Tag', 'No H1 tag — critical SEO issue')
+          : warnItem('H1 Tag', `${seo.h1_count} H1 tags found — should be exactly 1`);
+      seoHtml += h1Item;
+    }
+    if (seo.images_total !== undefined) {
+      const missing = seo.images_total - seo.images_with_alt;
+      seoHtml += checkItem(missing === 0,
+        'Image Alt Tags',
+        `${seo.images_with_alt} / ${seo.images_total} images have alt text` +
+          (missing > 0 ? ` — ${missing} missing` : ''));
+    }
+    if (!seoHtml) seoHtml = '<li class="check-item"><span class="check-text" style="color:var(--text-muted)">Static analysis blocked — data unavailable</span></li>';
+    document.getElementById('seo-checklist').innerHTML = seoHtml;
+
+    // ── Hick's Law ────────────────────────────────────────────────────────
+    const hicks = (data.analysis && data.analysis.hicks) || {};
+    document.getElementById('hicks-links').textContent   = hicks.links   ?? '—';
+    document.getElementById('hicks-buttons').textContent = hicks.buttons ?? '—';
+    document.getElementById('hicks-inputs').textContent  = hicks.inputs  ?? '—';
+    document.getElementById('hicks-total').textContent   = hicks.total   ?? '—';
+
+    const verdictEl = document.getElementById('hicks-verdict');
+    if (hicks.verdict) {
+      verdictEl.textContent = hicks.verdict;
+      verdictEl.className   = 'verdict-badge ' + (hicks.verdict === 'Decision Paralysis' ? 'badge-danger' : 'badge-ok');
+    } else {
+      verdictEl.textContent = 'N/A';
+      verdictEl.className   = 'verdict-badge';
+    }
+
+    // ── Tech Stack ────────────────────────────────────────────────────────
+    const stack   = (data.analysis && data.analysis.tech_stack) || [];
+    const techDiv = document.getElementById('tech-tags');
+    if (stack.length > 0) {
+      techDiv.innerHTML = stack.map(t => `<span class="tag">${t}</span>`).join('');
+    } else {
+      techDiv.innerHTML = '<span class="tag-none">No technologies detected (analysis may have been blocked)</span>';
+    }
+
+    // ── Initial revenue render ────────────────────────────────────────────
+    const initTraffic = 5000;
+    const initAov     = 50;
+    const initLeak    = recalcLeak(initTraffic, initAov, data);
+    updateRevenue(initLeak, true);
+
+    // ── Sliders ───────────────────────────────────────────────────────────
+    const trafficSlider = document.getElementById('traffic-slider');
+    const aovSlider     = document.getElementById('aov-slider');
+    const trafficDisp   = document.getElementById('traffic-display');
+    const aovDisp       = document.getElementById('aov-display');
+
+    function onSliderChange() {
+      const t = parseInt(trafficSlider.value, 10);
+      const a = parseInt(aovSlider.value, 10);
+      trafficDisp.textContent = fmt(t);
+      aovDisp.textContent     = '$' + fmt(a);
+      const leak = recalcLeak(t, a, data);
+      updateRevenue(leak, false);
+    }
+
+    trafficSlider.addEventListener('input', onSliderChange);
+    aovSlider.addEventListener('input', onSliderChange);
+
+  })();
+  </script>
 </body>
 </html>

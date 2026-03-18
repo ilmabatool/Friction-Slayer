@@ -1,12 +1,19 @@
 require('dotenv').config();
 const express = require('express'), path = require('path');
 const axios = require('axios');
-const { analyzeHicksLaw } = require('./services/scraper'); // Assuming this is your custom scraper
+const { analyzeSite } = require('./services/analyzer');
 const { calculateLeak } = require('./utils/leak_calc');
 
 const app = express(), PORT = process.env.PORT || 3000;
 
 app.use(express.json(), express.urlencoded({ extended: true }));
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(path.join(__dirname)));
 
@@ -46,24 +53,26 @@ app.post('/analyze', async (req, res) => {
 
     console.log(`[SYSTEM] Engaging Google V8 for: ${url}`);
 
-    // Run Scraper and Real API in parallel
-    const [hicks, cwv] = await Promise.all([
-      analyzeHicksLaw(url).catch(() => ({ elements: 0 })), // Fallback if scraper fails
+    // Run deep site analysis and PageSpeed in parallel
+    const [analysis, cwv] = await Promise.all([
+      analyzeSite(url).catch(() => ({ status: 'ERROR', seo: null, hicks: null, neuromarketing: null, tech_stack: [] })),
       getPageSpeedMetrics(url)
     ]);
 
-    // Quantify Revenue Leak (Grounded in Google Data)
-    const report = calculateLeak({ 
-      lcp: cwv.lcp, 
-      tti: cwv.tti,
-      elements: hicks.elements 
+    // Quantify Revenue Leak with full breakdown
+    const report = calculateLeak({
+      lcp:            cwv.lcp,
+      tti:            cwv.tti,
+      seo:            analysis.seo,
+      neuromarketing: analysis.neuromarketing,
     });
 
     res.json({
       success: true,
       url,
-      metrics: cwv,
-      report, // Contains annualLeak, monthlyLeak, etc.
+      metrics:  cwv,
+      analysis,
+      report,
       status: "VERIFIED_BY_GOOGLE"
     });
 

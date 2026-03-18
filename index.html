@@ -304,6 +304,7 @@ const overlay = document.getElementById('scan-overlay');
 const output = document.getElementById('terminal-output');
 const fill = document.getElementById('progress-fill');
 const urlInput = document.getElementById('url-input');
+const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:3000' : window.location.origin;
 
 const messages = [
   "▸ Initializing Google V8 Intelligence Nodes...",
@@ -328,7 +329,7 @@ form.addEventListener('submit', async (e) => {
   }
 
   try {
-    const res = await fetch('/analyze', {
+    const res = await fetch(`${API_BASE}/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url })
@@ -339,7 +340,7 @@ form.addEventListener('submit', async (e) => {
     if (result.success) {
       // Pass the real Google data to the audit page
       sessionStorage.setItem('auditData', JSON.stringify(result));
-      window.location.href = '/audit';
+      window.location.href = `${API_BASE}/audit`;
     } else {
       throw new Error(result.error);
     }
