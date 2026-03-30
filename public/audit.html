@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Forensic Audit Report | Friction-Slayer</title>
+  <title>Analytics Audit Report | Friction-Slayer</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -83,10 +83,38 @@
       font-family: var(--mono);
       font-size: 13px;
       color: var(--text-muted);
-      margin-bottom: 36px;
+      margin-bottom: 20px;
       word-break: break-all;
     }
     .hero-url span { color: var(--cyan); }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+      border: 1px solid transparent;
+    }
+    .status-critical {
+      color: var(--red);
+      background: var(--red-dim);
+      border-color: rgba(255, 51, 51, 0.35);
+    }
+    .status-average {
+      color: var(--gold);
+      background: var(--gold-dim);
+      border-color: rgba(255, 215, 0, 0.35);
+    }
+    .status-excellent {
+      color: var(--green);
+      background: var(--green-dim);
+      border-color: rgba(0, 255, 136, 0.35);
+    }
 
     /* ── Revenue leak counter ─────────────────────────────────────────────── */
     .leak-block {
@@ -118,64 +146,6 @@
       color: rgba(255,80,80,0.55);
       margin-top: 6px;
       font-family: var(--mono);
-    }
-
-    /* ── Calibration sliders ──────────────────────────────────────────────── */
-    .calibration {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 24px 28px;
-      margin: 24px 0 36px;
-      opacity: 0;
-      animation: fade-up 0.6s ease 0.3s forwards;
-    }
-    .calibration-title {
-      font-size: 11px;
-      letter-spacing: 0.14em;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      font-family: var(--mono);
-      margin-bottom: 20px;
-    }
-    .sliders-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 28px;
-    }
-    @media (max-width: 600px) { .sliders-row { grid-template-columns: 1fr; } }
-    .slider-group label {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      font-size: 13px;
-      color: #aaa;
-      margin-bottom: 10px;
-    }
-    .slider-val {
-      font-family: var(--mono);
-      font-size: 13px;
-      color: var(--gold);
-      font-weight: 600;
-    }
-    input[type=range] {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 100%;
-      height: 3px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 3px;
-      outline: none;
-      cursor: pointer;
-    }
-    input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: var(--gold);
-      cursor: pointer;
-      box-shadow: 0 0 8px rgba(255,215,0,0.5);
     }
 
     /* ── Bento grid ───────────────────────────────────────────────────────── */
@@ -330,6 +300,45 @@
     }
     .tag-none { color: var(--text-muted); font-size: 13px; }
 
+    .principle-list {
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    @media (max-width: 760px) {
+      .principle-list { grid-template-columns: 1fr; }
+    }
+    .principle-item {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 13px;
+      color: #ccc;
+    }
+    .principle-state {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 4px 8px;
+      border-radius: 999px;
+    }
+    .state-on {
+      color: var(--green);
+      background: var(--green-dim);
+      border: 1px solid rgba(0,255,136,0.3);
+    }
+    .state-off {
+      color: var(--red);
+      background: var(--red-dim);
+      border: 1px solid rgba(255,51,51,0.3);
+    }
+
     /* ── Action console ───────────────────────────────────────────────────── */
     .action-console {
       background: var(--surface);
@@ -424,6 +433,20 @@
       display: none;
     }
 
+    .runtime-warning {
+      background: rgba(255, 140, 0, 0.12);
+      border: 1px solid rgba(255, 140, 0, 0.35);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 12px;
+      color: #ffb347;
+      font-family: var(--mono);
+      margin-bottom: 16px;
+      display: none;
+      line-height: 1.5;
+      white-space: pre-line;
+    }
+
     /* ── Animations ───────────────────────────────────────────────────────── */
     @keyframes fade-up {
       from { opacity: 0; transform: translateY(16px); }
@@ -470,6 +493,13 @@
       text-transform: uppercase;
       margin: 28px 0 16px;
     }
+
+    .small-note {
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+    }
   </style>
 </head>
 <body>
@@ -477,7 +507,7 @@
   <!-- Loading state -->
   <div id="loading-screen">
     <div class="spin"></div>
-    <span>LOADING FORENSIC REPORT…</span>
+    <span>Loading website health report...</span>
   </div>
 
   <!-- Main content -->
@@ -485,114 +515,119 @@
 
     <!-- Hero -->
     <div class="hero">
-      <div class="hero-badge">⬤ AUDIT COMPLETE — FORENSIC GRADE</div>
-      <h1 class="hero-title">Revenue Leak Identified</h1>
+      <div class="hero-badge">ANALYSIS COMPLETE</div>
+      <h1 class="hero-title">Revenue Opportunities Found</h1>
       <p class="hero-url">Target: <span id="target-url">—</span></p>
+      <div id="overall-status" class="status-pill">Overall: —</div>
       <div id="blocked-notice" class="blocked-notice">
         ⚠ Site returned a 403/429 — static analysis may be partial. Performance data from Google is accurate.
       </div>
+      <div id="runtime-warning" class="runtime-warning"></div>
       <div class="leak-block">
-        <div class="leak-label">Estimated Annual Revenue Leak</div>
+        <div class="leak-label">Estimated Annual Revenue at Risk</div>
         <div class="leak-amount">$<span id="leak-counter">0</span></div>
-        <div class="leak-sub" id="monthly-loss-label">—/month · based on your traffic &amp; AOV</div>
+        <div class="leak-sub" id="monthly-loss-label">—/month · sourced from your Google Analytics data</div>
       </div>
       <div class="stat-row">
+        <span>Traffic: <b id="traffic-stat">—</b></span>
+        <span>AOV: <b id="aov-stat">—</b></span>
         <span>Daily: <b id="daily-stat">—</b></span>
         <span>Monthly: <b id="monthly-stat">—</b></span>
         <span>Penalty: <b id="penalty-stat">—</b></span>
       </div>
     </div>
 
-    <!-- Calibration sliders -->
-    <div class="calibration">
-      <div class="calibration-title">▸ Accuracy Calibration — Enter Your Real Numbers</div>
-      <div class="sliders-row">
-        <div class="slider-group">
-          <label>
-            Monthly Visitors
-            <span class="slider-val" id="traffic-display">5,000</span>
-          </label>
-          <input type="range" id="traffic-slider" min="500" max="100000" step="500" value="5000">
-        </div>
-        <div class="slider-group">
-          <label>
-            Avg. Order Value
-            <span class="slider-val" id="aov-display">$50</span>
-          </label>
-          <input type="range" id="aov-slider" min="10" max="2000" step="10" value="50">
-        </div>
-      </div>
-    </div>
-
     <!-- Bento grid -->
-    <div class="section-sep">▸ Forensic Breakdown</div>
+    <div class="section-sep">Breakdown By Category</div>
 
     <div class="bento">
 
       <!-- Speed / Core Web Vitals -->
       <div class="card card-span-6 stagger-1">
-        <div class="card-label">01 / Performance</div>
-        <div class="card-title">Core Web Vitals</div>
+        <div class="card-label">01 / Speed and Responsiveness</div>
+        <div class="card-title">Page Experience</div>
         <div class="metric-bar-row">
           <div class="metric-bar-header">
-            <span class="metric-name">LCP — Largest Contentful Paint</span>
+            <span class="metric-name">Load Speed (LCP)</span>
             <span class="metric-score" id="lcp-label" style="color:var(--red)">—s</span>
           </div>
           <div class="bar-track"><div class="bar-fill bar-red" id="lcp-bar"></div></div>
         </div>
         <div class="metric-bar-row">
           <div class="metric-bar-header">
-            <span class="metric-name">TTI — Time to Interactive</span>
+            <span class="metric-name">Time To Interact (TTI)</span>
             <span class="metric-score" id="tti-label" style="color:var(--gold)">—ms</span>
           </div>
           <div class="bar-track"><div class="bar-fill bar-yellow" id="tti-bar"></div></div>
+        </div>
+        <div class="metric-bar-row">
+          <div class="metric-bar-header">
+            <span class="metric-name">First Contentful Paint (FCP)</span>
+            <span class="metric-score" id="fcp-label" style="color:var(--cyan)">—s</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill bar-cyan" id="fcp-bar"></div></div>
+        </div>
+        <div class="metric-bar-row">
+          <div class="metric-bar-header">
+            <span class="metric-name">Speed Index</span>
+            <span class="metric-score" id="speed-index-label" style="color:var(--gold)">—s</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill bar-orange" id="speed-index-bar"></div></div>
         </div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:8px;font-family:var(--mono)">
           Source: Google PageSpeed Insights API (Mobile)
         </div>
       </div>
 
-      <!-- Neuromarketing -->
+      <!-- Google-inspired diagnostics -->
       <div class="card card-span-6 stagger-2">
-        <div class="card-label">02 / Neuromarketing</div>
-        <div class="card-title">Psychological Triggers</div>
+        <div class="card-label">02 / Google-Inspired Diagnostics</div>
+        <div class="card-title">Performance Health Snapshot</div>
         <div class="metric-bar-row">
           <div class="metric-bar-header">
-            <span class="metric-name">Urgency Signals</span>
-            <span class="metric-score" id="urgency-score" style="color:var(--red)">0</span>
+            <span class="metric-name">Performance Score</span>
+            <span class="metric-score" id="performance-score" style="color:var(--green)">—/100</span>
           </div>
-          <div class="bar-track"><div class="bar-fill bar-red" id="urgency-bar"></div></div>
+          <div class="bar-track"><div class="bar-fill bar-green" id="performance-bar"></div></div>
         </div>
         <div class="metric-bar-row">
           <div class="metric-bar-header">
-            <span class="metric-name">Social Proof &amp; Trust</span>
-            <span class="metric-score" id="social-score" style="color:var(--cyan)">0</span>
+            <span class="metric-name">Cumulative Layout Shift (CLS)</span>
+            <span class="metric-score" id="cls-score" style="color:var(--cyan)">—</span>
           </div>
-          <div class="bar-track"><div class="bar-fill bar-cyan" id="social-bar"></div></div>
+          <div class="bar-track"><div class="bar-fill bar-cyan" id="cls-bar"></div></div>
         </div>
         <div class="metric-bar-row">
           <div class="metric-bar-header">
-            <span class="metric-name">Authority Signals</span>
-            <span class="metric-score" id="authority-score" style="color:var(--green)">0</span>
+            <span class="metric-name">Time To Interact Quality</span>
+            <span class="metric-score" id="tti-quality" style="color:var(--gold)">—</span>
           </div>
-          <div class="bar-track"><div class="bar-fill bar-green" id="authority-bar"></div></div>
+          <div class="bar-track"><div class="bar-fill bar-yellow" id="tti-quality-bar"></div></div>
         </div>
+        <div class="small-note">These values mirror the same style used by Google Lighthouse performance diagnostics.</div>
       </div>
 
       <!-- SEO Health -->
       <div class="card card-span-6 stagger-3">
-        <div class="card-label">03 / SEO Health</div>
-        <div class="card-title">On-Page Signals</div>
+        <div class="card-label">03 / Search Visibility</div>
+        <div class="card-title">Can Search Engines Read Your Page?</div>
         <ul class="check-list" id="seo-checklist">
           <!-- populated by JS -->
         </ul>
       </div>
 
-      <!-- Cognitive Load (Hick's Law) -->
+      <!-- Neuromarketing principles -->
       <div class="card card-span-6 stagger-4">
-        <div class="card-label">04 / Cognitive Load</div>
-        <div class="card-title">Hick's Law Analysis</div>
-        <div class="hicks-row" id="hicks-row">
+        <div class="card-label">04 / Neuromarketing Principles</div>
+        <div class="card-title">Persuasion Framework Coverage</div>
+        <ul class="principle-list" id="principle-list"></ul>
+      </div>
+
+      <!-- Decision clarity (Hick's Law detail) -->
+      <div class="card card-span-6 stagger-5">
+        <div class="card-label">05 / Decision Clarity</div>
+        <div class="card-title">How Many Choices Are Visitors Facing?</div>
+        <div class="hicks-row">
           <div class="hicks-box">
             <div class="hicks-count" id="hicks-links" style="color:var(--cyan)">—</div>
             <div class="hicks-sub">Links</div>
@@ -610,18 +645,12 @@
             <div class="hicks-sub">Total</div>
           </div>
         </div>
-        <div style="margin-bottom:12px">
-          <span class="verdict-badge" id="hicks-verdict">—</span>
-        </div>
-        <div style="font-size:12px;color:var(--text-muted);line-height:1.6">
-          Hick's Law: decision time rises logarithmically with choices.
-          Optimal interactive element count is ≤ 12.
-        </div>
+        <span class="verdict-badge" id="hicks-verdict">—</span>
       </div>
 
       <!-- Tech Stack -->
       <div class="card card-span-12 stagger-5">
-        <div class="card-label">05 / Tech Stack</div>
+        <div class="card-label">06 / Technology Snapshot</div>
         <div class="card-title">Detected Technologies</div>
         <div id="tech-tags" class="tag-list"></div>
       </div>
@@ -629,11 +658,11 @@
     </div>
 
     <!-- Action Console -->
-    <div class="section-sep">▸ Critical Failures</div>
+    <div class="section-sep">Priority Fixes</div>
     <div class="action-console">
       <div class="console-header">
         <div class="console-dot"></div>
-        <div class="console-title">Action Console — Sorted by Revenue Impact</div>
+        <div class="console-title">Fix Priority - Highest Revenue Impact First</div>
       </div>
       <ul class="failure-list" id="failure-list">
         <!-- populated by JS -->
@@ -645,7 +674,6 @@
   <script>
   (function () {
 
-    // ── Helpers ─────────────────────────────────────────────────────────────
     function fmt(n)  { return Number(n).toLocaleString(); }
     function fmtD(n) { return '$' + fmt(n); }
 
@@ -684,52 +712,6 @@
       </li>`;
     }
 
-    // ── Revenue leak recalculator (mirrors server logic) ────────────────────
-    function recalcLeak(traffic, aov, data) {
-      const lcp  = data.metrics ? data.metrics.lcp  : null;
-      const seo  = data.analysis ? data.analysis.seo : null;
-      const neuro= data.analysis ? data.analysis.neuromarketing : null;
-
-      const convBase = 0.02;
-      const base     = traffic * convBase * aov;
-      let   rate     = 0;
-      const bdown    = [];
-
-      if (lcp === null || lcp === undefined || lcp > 2.5) {
-        rate += 0.15;
-        bdown.push({ issue: 'Slow Page Load (LCP)',
-          detail: `LCP ${lcp ? lcp.toFixed(2)+'s' : 'unknown'} exceeds 2.5 s`,
-          monthlyLoss: Math.round(base * 0.15) });
-      }
-      if (seo && seo.h1_count !== 1) {
-        rate += 0.05;
-        bdown.push({ issue: 'Missing / Duplicate H1 Tag',
-          detail: `${seo.h1_count ?? 0} H1 tag(s) found — should be exactly 1`,
-          monthlyLoss: Math.round(base * 0.05) });
-      }
-      if (seo && !seo.meta_description_exists) {
-        rate += 0.05;
-        bdown.push({ issue: 'Missing Meta Description',
-          detail: 'No meta description reduces organic CTR by ~5 %',
-          monthlyLoss: Math.round(base * 0.05) });
-      }
-      if (neuro && !neuro.social_proof) {
-        rate += 0.10;
-        bdown.push({ issue: 'No Social Proof Signals',
-          detail: 'Missing reviews/testimonials reduce trust conversion by ~10 %',
-          monthlyLoss: Math.round(base * 0.10) });
-      }
-      const monthly = Math.round(base * rate);
-      return {
-        annual:   monthly * 12,
-        monthly,
-        daily:    +(monthly / 30).toFixed(2),
-        rate:     Math.round(rate * 100),
-        breakdown: bdown,
-      };
-    }
-
-    // ── Update Action Console ────────────────────────────────────────────────
     function renderConsole(breakdown) {
       const list = document.getElementById('failure-list');
       if (!breakdown || breakdown.length === 0) {
@@ -751,25 +733,51 @@
       ).join('');
     }
 
-    // ── Update revenue numbers ───────────────────────────────────────────────
-    let currentAnnual = 0;
-    function updateRevenue(leakData, animate) {
+    function updateRevenue(leakData, ga4, animate) {
       document.getElementById('daily-stat').textContent   = fmtD(leakData.daily);
       document.getElementById('monthly-stat').textContent = fmtD(leakData.monthly);
       document.getElementById('penalty-stat').textContent = leakData.rate + '% penalty';
+      document.getElementById('traffic-stat').textContent = fmt(ga4.traffic || 0);
+      document.getElementById('aov-stat').textContent = fmtD(ga4.aov || 0);
       document.getElementById('monthly-loss-label').textContent =
-        `${fmtD(leakData.monthly)}/month · adjusted to your traffic & AOV`;
+        `${fmtD(leakData.monthly)}/month · calculated from Google Analytics traffic & order value`;
 
       if (animate) {
         countUp(document.getElementById('leak-counter'), leakData.annual, 1600);
       } else {
         countUp(document.getElementById('leak-counter'), leakData.annual, 600);
       }
-      currentAnnual = leakData.annual;
       renderConsole(leakData.breakdown);
     }
 
-    // ── Main init ────────────────────────────────────────────────────────────
+    function applyOverallStatus(label) {
+      const el = document.getElementById('overall-status');
+      el.textContent = `Overall: ${label || 'Average'}`;
+      el.className = 'status-pill';
+      if (label === 'Immediate Work Needed') el.classList.add('status-critical');
+      else if (label === 'Excellent') el.classList.add('status-excellent');
+      else el.classList.add('status-average');
+    }
+
+    function renderPrinciples(neuro, hicks) {
+      const list = document.getElementById('principle-list');
+      const principles = neuro.principles || {};
+      const items = [
+        { label: 'Anchoring', value: !!principles.anchoring },
+        { label: 'Loss Aversion', value: !!principles.loss_aversion },
+        { label: 'Decoy Effect', value: !!principles.decoy_effect },
+        { label: 'Hick\'s Law', value: principles.hicks_law === null ? (hicks.total !== null && hicks.total <= 12) : !!principles.hicks_law },
+        { label: 'Halo Effect', value: !!principles.halo_effect },
+        { label: 'Memory Anchor', value: !!principles.memory_anchor }
+      ];
+
+      list.innerHTML = items.map((item) => {
+        const stateClass = item.value ? 'state-on' : 'state-off';
+        const stateText = item.value ? 'Present' : 'Missing';
+        return `<li class="principle-item"><span>${item.label}</span><span class="principle-state ${stateClass}">${stateText}</span></li>`;
+      }).join('');
+    }
+
     const raw = sessionStorage.getItem('auditData');
     if (!raw) {
       window.location.href = '/';
@@ -783,56 +791,71 @@
     document.getElementById('loading-screen').style.display = 'none';
     document.getElementById('main-content').style.display   = 'block';
 
-    // ── Target URL ────────────────────────────────────────────────────────
     document.getElementById('target-url').textContent = data.url || '—';
+    applyOverallStatus(data.overallStatus);
 
-    // ── Blocked notice ────────────────────────────────────────────────────
     if (data.analysis && data.analysis.status === 'BLOCKED') {
       document.getElementById('blocked-notice').style.display = 'block';
     }
 
-    // ── Performance bars ─────────────────────────────────────────────────
+    if (Array.isArray(data.warnings) && data.warnings.length > 0) {
+      const warningEl = document.getElementById('runtime-warning');
+      warningEl.textContent = `⚠ Partial report notice:\n${data.warnings.join('\n')}`;
+      warningEl.style.display = 'block';
+    }
+
     const metrics = data.metrics || {};
-    const lcp = metrics.lcp || 0;
-    const tti = metrics.tti || 0;
+    const lcp = metrics.lcp;
+    const tti = metrics.tti;
+    const fcp = metrics.fcp;
+    const cls = metrics.cls;
+    const speedIndex = metrics.speedIndex;
+    const performanceScore = metrics.performanceScore;
 
     const lcpLabel = document.getElementById('lcp-label');
-    lcpLabel.textContent = lcp ? lcp.toFixed(2) + 's' : 'N/A';
-    const lcpPct = Math.min((lcp / 8) * 100, 100);
+    lcpLabel.textContent = Number.isFinite(lcp) ? lcp.toFixed(2) + 's' : 'N/A';
+    const lcpPct = Number.isFinite(lcp) ? Math.min((lcp / 8) * 100, 100) : 2;
     lcpLabel.style.color = lcp > 4 ? 'var(--red)' : lcp > 2.5 ? 'var(--gold)' : 'var(--green)';
     setBar('lcp-bar', lcpPct);
     document.getElementById('lcp-bar').className =
       'bar-fill ' + (lcp > 4 ? 'bar-red' : lcp > 2.5 ? 'bar-yellow' : 'bar-green');
 
     const ttiLabel = document.getElementById('tti-label');
-    ttiLabel.textContent = tti ? Math.round(tti) + 'ms' : 'N/A';
-    const ttiPct = Math.min((tti / 10000) * 100, 100);
+    ttiLabel.textContent = Number.isFinite(tti) ? Math.round(tti) + 'ms' : 'N/A';
+    const ttiPct = Number.isFinite(tti) ? Math.min((tti / 10000) * 100, 100) : 2;
     ttiLabel.style.color = tti > 5000 ? 'var(--red)' : tti > 3800 ? 'var(--gold)' : 'var(--green)';
     setBar('tti-bar', ttiPct);
     document.getElementById('tti-bar').className =
       'bar-fill ' + (tti > 5000 ? 'bar-red' : tti > 3800 ? 'bar-yellow' : 'bar-green');
 
-    // ── Neuromarketing bars ───────────────────────────────────────────────
+    const fcpLabel = document.getElementById('fcp-label');
+    fcpLabel.textContent = Number.isFinite(fcp) ? fcp.toFixed(2) + 's' : 'N/A';
+    setBar('fcp-bar', Number.isFinite(fcp) ? Math.min((fcp / 6) * 100, 100) : 2);
+
+    const speedLabel = document.getElementById('speed-index-label');
+    speedLabel.textContent = Number.isFinite(speedIndex) ? speedIndex.toFixed(2) + 's' : 'N/A';
+    setBar('speed-index-bar', Number.isFinite(speedIndex) ? Math.min((speedIndex / 10) * 100, 100) : 2);
+
+    const performanceEl = document.getElementById('performance-score');
+    performanceEl.textContent = Number.isFinite(performanceScore) ? `${performanceScore}/100` : 'N/A';
+    setBar('performance-bar', Number.isFinite(performanceScore) ? performanceScore : 2);
+    performanceEl.style.color = performanceScore < 50 ? 'var(--red)' : performanceScore < 80 ? 'var(--gold)' : 'var(--green)';
+
+    const clsEl = document.getElementById('cls-score');
+    clsEl.textContent = Number.isFinite(cls) ? cls.toFixed(3) : 'N/A';
+    setBar('cls-bar', Number.isFinite(cls) ? Math.min(cls * 100, 100) : 2);
+    clsEl.style.color = cls > 0.25 ? 'var(--red)' : cls > 0.1 ? 'var(--gold)' : 'var(--green)';
+
+    const ttiQuality = document.getElementById('tti-quality');
+    let ttiState = 'Unknown';
+    if (Number.isFinite(tti)) ttiState = tti > 5000 ? 'Poor' : tti > 3800 ? 'Average' : 'Excellent';
+    ttiQuality.textContent = ttiState;
+    setBar('tti-quality-bar', ttiState === 'Poor' ? 85 : ttiState === 'Average' ? 55 : 25);
+
     const neuro = (data.analysis && data.analysis.neuromarketing) || {};
-    const maxKw = 6;
+    const hicks = (data.analysis && data.analysis.hicks) || {};
+    renderPrinciples(neuro, hicks);
 
-    const urgCnt  = neuro.urgency_count      || 0;
-    const socCnt  = neuro.social_proof_count || 0;
-    const authCnt = neuro.authority_count    || 0;
-
-    document.getElementById('urgency-score').textContent   = urgCnt  + ' / ' + maxKw;
-    document.getElementById('social-score').textContent    = socCnt  + ' / ' + maxKw;
-    document.getElementById('authority-score').textContent = authCnt + ' / ' + maxKw;
-
-    document.getElementById('urgency-score').style.color   = urgCnt  === 0 ? 'var(--red)' : 'var(--gold)';
-    document.getElementById('social-score').style.color    = socCnt  === 0 ? 'var(--red)' : 'var(--cyan)';
-    document.getElementById('authority-score').style.color = authCnt === 0 ? 'var(--red)' : 'var(--green)';
-
-    setBar('urgency-bar',  (urgCnt  / maxKw) * 100);
-    setBar('social-bar',   (socCnt  / maxKw) * 100);
-    setBar('authority-bar',(authCnt / maxKw) * 100);
-
-    // ── SEO checklist ─────────────────────────────────────────────────────
     const seo = (data.analysis && data.analysis.seo) || {};
     let seoHtml = '';
 
@@ -869,8 +892,6 @@
     if (!seoHtml) seoHtml = '<li class="check-item"><span class="check-text" style="color:var(--text-muted)">Static analysis blocked — data unavailable</span></li>';
     document.getElementById('seo-checklist').innerHTML = seoHtml;
 
-    // ── Hick's Law ────────────────────────────────────────────────────────
-    const hicks = (data.analysis && data.analysis.hicks) || {};
     document.getElementById('hicks-links').textContent   = hicks.links   ?? '—';
     document.getElementById('hicks-buttons').textContent = hicks.buttons ?? '—';
     document.getElementById('hicks-inputs').textContent  = hicks.inputs  ?? '—';
@@ -885,7 +906,6 @@
       verdictEl.className   = 'verdict-badge';
     }
 
-    // ── Tech Stack ────────────────────────────────────────────────────────
     const stack   = (data.analysis && data.analysis.tech_stack) || [];
     const techDiv = document.getElementById('tech-tags');
     if (stack.length > 0) {
@@ -894,29 +914,16 @@
       techDiv.innerHTML = '<span class="tag-none">No technologies detected (analysis may have been blocked)</span>';
     }
 
-    // ── Initial revenue render ────────────────────────────────────────────
-    const initTraffic = 5000;
-    const initAov     = 50;
-    const initLeak    = recalcLeak(initTraffic, initAov, data);
-    updateRevenue(initLeak, true);
-
-    // ── Sliders ───────────────────────────────────────────────────────────
-    const trafficSlider = document.getElementById('traffic-slider');
-    const aovSlider     = document.getElementById('aov-slider');
-    const trafficDisp   = document.getElementById('traffic-display');
-    const aovDisp       = document.getElementById('aov-display');
-
-    function onSliderChange() {
-      const t = parseInt(trafficSlider.value, 10);
-      const a = parseInt(aovSlider.value, 10);
-      trafficDisp.textContent = fmt(t);
-      aovDisp.textContent     = '$' + fmt(a);
-      const leak = recalcLeak(t, a, data);
-      updateRevenue(leak, false);
-    }
-
-    trafficSlider.addEventListener('input', onSliderChange);
-    aovSlider.addEventListener('input', onSliderChange);
+    const report = data.report || {};
+    const ga4 = data.ga4 || { traffic: 0, aov: 0 };
+    const leakData = {
+      annual: report.annualLeak || 0,
+      monthly: report.monthlyExposure || 0,
+      daily: report.dailyLoss || 0,
+      rate: report.totalPenaltyRate || 0,
+      breakdown: report.breakdown || []
+    };
+    updateRevenue(leakData, ga4, true);
 
   })();
   </script>

@@ -1,12 +1,20 @@
 require('dotenv').config();
 const express = require('express'), path = require('path');
 const axios = require('axios');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const session = require('express-session');
 const { analyzeSite } = require('./services/analyzer');
+const { getPageSpeedMetrics } = require('./services/pagespeed');
 const { calculateLeak } = require('./utils/leak_calc');
+const { env } = require('./config/env');
 
-const app = express(), PORT = process.env.PORT || 3000;
+const app = express(), PORT = env.PORT;
 
 app.use(express.json(), express.urlencoded({ extended: true }));
+app.use(session({ secret: env.SESSION_SECRET, resave: false, saveUninitialized: true }));
+app.use(passport.initialize());
+app.use(passport.session());
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
@@ -14,75 +22,243 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.static(path.join(__dirname)));
 
-// ─── AUTHENTICITY ENGINE ──────────────────────────────────────────────────
-async function getPageSpeedMetrics(url) {
-  const apiKey = process.env.GOOGLE_PAGESPEED_API_KEY;
-  if (!apiKey) throw new Error("API Key Missing. Add GOOGLE_PAGESPEED_API_KEY to .env");
-  
-  const cleanUrl = url.startsWith('http') ? url : `https://${url}`;
-  const psiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(cleanUrl)}&key=${apiKey}&strategy=mobile`;
-
-  // Retries for 429 Errors
-  let attempts = 0;
-  while (attempts < 3) {
-    try {
-      const response = await axios.get(psiUrl);
-      const audits = response.data.lighthouseResult.audits;
-      return {
-        lcp: audits['largest-contentful-paint'].numericValue / 1000,
-        tti: audits['interactive'].numericValue,
-        isAuthentic: true
-      };
-    } catch (error) {
-      if (error.response?.status === 429) {
-        attempts++;
-        await new Promise(r => setTimeout(r, 2000 * attempts));
-      } else throw error;
-    }
-  }
+function ensureAuthenticated(req, res, next) {
+  if (req.isAuthenticated && req.isAuthenticated()) return next();
+  if (req.accepts('html')) return res.redirect('/auth/google');
+  return res.status(401).json({ error: 'Authentication required. Sign in with Google first.' });
 }
 
+function getErrorText(err) {
+  if (!err) return 'Unknown error';
+  if (err.response && err.response.data) {
+    const upstream = err.response.data.error || err.response.data;
+    if (typeof upstream === 'string') return upstream;
+    if (upstream.message) return upstream.message;
+  }
+  return err.message || 'Unknown error';
+}
+
+function fallbackPageSpeedMetrics() {
+  return {
+    lcp: null,
+    fcp: null,
+    tti: null,
+    cls: null,
+    speedIndex: null,
+    performanceScore: null,
+    isAuthentic: false
+  };
+}
+
+async function fetchGa4Data(accessToken) {
+  if (!env.GA4_PROPERTY_ID) {
+    throw new Error('GA4_PROPERTY_ID is missing in environment configuration.');
+  }
+
+  const endpoint = `https://analyticsdata.googleapis.com/v1beta/properties/${env.GA4_PROPERTY_ID}:runReport`;
+
+  const { data } = await axios.post(
+    endpoint,
+    {
+      dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+      metrics: [
+        { name: 'activeUsers' },
+        { name: 'totalRevenue' },
+        { name: 'ecommercePurchases' }
+      ]
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 20000
+    }
+  );
+
+  const values = data.rows && data.rows[0] && data.rows[0].metricValues
+    ? data.rows[0].metricValues
+    : [];
+
+  const traffic = Number(values[0] && values[0].value ? values[0].value : 0);
+  const revenue = Number(values[1] && values[1].value ? values[1].value : 0);
+  const purchases = Number(values[2] && values[2].value ? values[2].value : 0);
+  const aov = purchases > 0 ? +(revenue / purchases).toFixed(2) : 0;
+
+  return { traffic, revenue, purchases, aov };
+}
+
+function fallbackGa4Data() {
+  return {
+    traffic: 5000,
+    revenue: 0,
+    purchases: 0,
+    aov: 50,
+    isFallback: true
+  };
+}
+
+passport.use(new GoogleStrategy({
+    clientID: env.GOOGLE_CLIENT_ID,
+    clientSecret: env.GOOGLE_CLIENT_SECRET,
+    callbackURL: env.GOOGLE_CALLBACK_URL
+  },
+  function(accessToken, refreshToken, profile, cb) {
+    return cb(null, { profile, accessToken });
+  }
+));
+
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((obj, done) => done(null, obj));
+
+app.get('/auth/status', (req, res) => {
+  const authenticated = !!(req.isAuthenticated && req.isAuthenticated());
+  const profile = authenticated && req.user && req.user.profile ? req.user.profile : null;
+
+  res.json({
+    authenticated,
+    user: profile ? {
+      displayName: profile.displayName || '',
+      email: (profile.emails && profile.emails[0] && profile.emails[0].value) || '',
+      avatar: (profile.photos && profile.photos[0] && profile.photos[0].value) || ''
+    } : null
+  });
+});
+
+app.get('/auth/google', (req, res, next) => {
+  const returnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : '/';
+  req.session.returnTo = returnTo;
+  passport.authenticate('google', {
+    scope: ['profile', 'https://www.googleapis.com/auth/analytics.readonly']
+  })(req, res, next);
+});
+
+app.get('/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/auth/google' }),
+  (req, res) => {
+    const returnTo = req.session.returnTo || '/';
+    delete req.session.returnTo;
+    res.redirect(returnTo);
+  });
+
+app.get('/auth/logout', async (req, res) => {
+  try {
+    const accessToken = req.user && req.user.accessToken ? req.user.accessToken : null;
+    if (accessToken) {
+      await axios.post(
+        'https://oauth2.googleapis.com/revoke',
+        new URLSearchParams({ token: accessToken }).toString(),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 10000 }
+      );
+    }
+  } catch (_err) {
+    // Ignore revoke failures and still complete local logout.
+  }
+
+  req.logout((logoutErr) => {
+    if (logoutErr) return res.redirect('/');
+    req.session.destroy(() => {
+      res.clearCookie('connect.sid');
+      res.redirect('/');
+    });
+  });
+});
+
+app.get('/api/ga4-data', ensureAuthenticated, async (req, res) => {
+  if (!req.user || !req.user.accessToken) return res.status(401).json({ error: 'Not logged in' });
+
+  try {
+    const ga4 = await fetchGa4Data(req.user.accessToken);
+    res.json(ga4);
+  } catch (error) {
+    if (error.response && error.response.status) {
+      const status = error.response.status;
+      if (status === 401 || status === 403) {
+        return res.status(status).json({ error: 'Google Analytics access denied. Please re-authenticate.' });
+      }
+      return res.status(502).json({ error: 'GA4 API request failed.', details: error.response.data });
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ─── UPGRADED ANALYSIS ROUTE ──────────────────────────────────────────────
-app.post('/analyze', async (req, res) => {
+app.post('/analyze', ensureAuthenticated, async (req, res) => {
   try {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'URL required.' });
+    if (!req.user || !req.user.accessToken) {
+      return res.status(401).json({ error: 'Authentication required. Sign in with Google first.' });
+    }
 
     console.log(`[SYSTEM] Engaging Google V8 for: ${url}`);
 
-    // Run deep site analysis and PageSpeed in parallel
-    const [analysis, cwv] = await Promise.all([
-      analyzeSite(url).catch(() => ({ status: 'ERROR', seo: null, hicks: null, neuromarketing: null, tech_stack: [] })),
+    const [analysisResult, cwvResult] = await Promise.allSettled([
+      analyzeSite(url).catch(() => ({ status: 'BLOCKED', seo: null, hicks: null, neuromarketing: null, tech_stack: [] })),
       getPageSpeedMetrics(url)
     ]);
 
-    // Quantify Revenue Leak with full breakdown
+    const analysis = analysisResult.status === 'fulfilled'
+      ? analysisResult.value
+      : { status: 'BLOCKED', seo: null, hicks: null, neuromarketing: null, tech_stack: [] };
+
+    const cwv = cwvResult.status === 'fulfilled'
+      ? cwvResult.value
+      : fallbackPageSpeedMetrics();
+
+    let ga4 = fallbackGa4Data();
+    const warnings = [];
+
+    try {
+      ga4 = await fetchGa4Data(req.user.accessToken);
+    } catch (ga4Error) {
+      warnings.push(`GA4 unavailable: ${getErrorText(ga4Error)}. Using baseline defaults.`);
+    }
+
+    if (cwvResult.status === 'rejected') {
+      warnings.push(`PageSpeed unavailable: ${getErrorText(cwvResult.reason)}`);
+    }
+    if (analysisResult.status === 'rejected') {
+      warnings.push('Site HTML analysis was blocked; partial report generated.');
+    }
+
     const report = calculateLeak({
-      lcp:            cwv.lcp,
-      tti:            cwv.tti,
-      seo:            analysis.seo,
+      traffic: ga4.traffic,
+      aov: ga4.aov,
+      lcp: cwv.lcp,
+      tti: cwv.tti,
+      seo: analysis.seo,
       neuromarketing: analysis.neuromarketing,
     });
+
+    let overallStatus = 'Excellent';
+    if (report.totalPenaltyRate > 25) overallStatus = 'Immediate Work Needed';
+    else if (report.totalPenaltyRate > 10) overallStatus = 'Average';
 
     res.json({
       success: true,
       url,
-      metrics:  cwv,
+      metrics: cwv,
+      ga4,
       analysis,
       report,
-      status: "VERIFIED_BY_GOOGLE"
+      status: 'VERIFIED_BY_GOOGLE',
+      overallStatus,
+      warnings
     });
 
   } catch (err) {
     console.error('[SYSTEM ERROR]', err.message);
-    res.status(500).json({ error: "Scan failed. Google is throttling or site is blocked." });
+    const reason = getErrorText(err);
+    if (err.response && err.response.status) {
+      return res.status(502).json({ error: 'Scan failed due to upstream Google API error.', reason });
+    }
+    res.status(500).json({ error: 'Scan failed.', reason });
   }
 });
 
-app.get('/',      (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/audit', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'audit.html')));
+app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/audit', ensureAuthenticated, (_req, res) => res.sendFile(path.join(__dirname, 'public', 'audit.html')));
 
 app.listen(PORT, () => console.log(`[MERCENARY ACTIVE] Port ${PORT}`));

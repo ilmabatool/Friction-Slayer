@@ -4,8 +4,8 @@
  * Psychological Trigger: Loss Aversion via granular, auditable breakdown
  */
 exports.calculateLeak = (metrics) => {
-    const traffic = metrics.traffic || 5000;   // Monthly visitors
-    const aov     = metrics.aov     || 50;     // Average Order Value ($)
+    const traffic = metrics.traffic ?? 5000;   // Monthly visitors
+    const aov     = metrics.aov ?? 50;         // Average Order Value ($)
     const convBase = 0.02;                     // 2% industry baseline conversion rate
 
     // Baseline monthly revenue without friction

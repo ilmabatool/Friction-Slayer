@@ -53,6 +53,112 @@
       z-index: 1;
     }
 
+    .topbar {
+      position: absolute;
+      top: 20px;
+      right: 24px;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .signin-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 38px;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 215, 0, 0.35);
+      color: #FFD700;
+      background: rgba(255, 215, 0, 0.07);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-weight: 600;
+      text-decoration: none;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+    .signin-btn:hover {
+      border-color: rgba(255, 215, 0, 0.7);
+      background: rgba(255, 215, 0, 0.14);
+    }
+
+    .account-menu {
+      position: relative;
+      display: none;
+    }
+    .avatar-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 215, 0, 0.45);
+      background: radial-gradient(circle at 30% 25%, rgba(255, 215, 0, 0.2), rgba(255, 215, 0, 0.06));
+      color: #FFD700;
+      font-weight: 700;
+      font-size: 12px;
+      font-family: 'Inter', sans-serif;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      cursor: pointer;
+    }
+    .avatar-btn img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .dropdown {
+      position: absolute;
+      right: 0;
+      top: 46px;
+      width: 220px;
+      border: 1px solid rgba(255, 215, 0, 0.2);
+      background: rgba(10, 10, 18, 0.98);
+      border-radius: 10px;
+      padding: 10px;
+      display: none;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    }
+    .account-menu:hover .dropdown {
+      display: block;
+    }
+    .dropdown-name {
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .dropdown-email {
+      color: #777;
+      font-size: 11px;
+      margin-bottom: 10px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .dropdown-logout {
+      display: inline-flex;
+      width: 100%;
+      justify-content: center;
+      height: 34px;
+      align-items: center;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 77, 77, 0.35);
+      background: rgba(255, 77, 77, 0.08);
+      color: #ff8787;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
     header {
       text-align: center;
     }
@@ -249,6 +355,18 @@
 <body>
 
   <div class="container">
+    <div class="topbar">
+      <a id="signin-btn" class="signin-btn" href="/auth/google?returnTo=/">Sign In</a>
+      <div id="account-menu" class="account-menu">
+        <div id="avatar-btn" class="avatar-btn">U</div>
+        <div class="dropdown">
+          <div id="dropdown-name" class="dropdown-name">User</div>
+          <div id="dropdown-email" class="dropdown-email">Signed in</div>
+          <a class="dropdown-logout" href="/auth/logout">Logout</a>
+        </div>
+      </div>
+    </div>
+
     <header>
       <span class="dolphin-anchor">🐬</span>
       <h1 class="headline">
@@ -304,7 +422,13 @@ const overlay = document.getElementById('scan-overlay');
 const output = document.getElementById('terminal-output');
 const fill = document.getElementById('progress-fill');
 const urlInput = document.getElementById('url-input');
+const signInBtn = document.getElementById('signin-btn');
+const accountMenu = document.getElementById('account-menu');
+const avatarBtn = document.getElementById('avatar-btn');
+const dropdownName = document.getElementById('dropdown-name');
+const dropdownEmail = document.getElementById('dropdown-email');
 const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:3000' : window.location.origin;
+const pendingScanKey = 'pendingScanUrl';
 
 const messages = [
   "▸ Initializing Google V8 Intelligence Nodes...",
@@ -314,12 +438,10 @@ const messages = [
   "▸ Generating 100% Authentic Executive Audit..."
 ];
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const url = urlInput.value;
-  if(!url) return;
-
+async function runScan(url) {
   overlay.classList.add('active');
+  output.style.color = 'rgba(255, 215, 0, 0.65)';
+  fill.style.width = '0%';
 
   // Animation Loop (6 Seconds of Tension)
   for (let i = 0; i < messages.length; i++) {
@@ -332,24 +454,102 @@ form.addEventListener('submit', async (e) => {
     const res = await fetch(`${API_BASE}/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ url })
     });
+
+    if (res.status === 401) {
+      sessionStorage.setItem(pendingScanKey, url);
+      window.location.href = `${API_BASE}/auth/google?returnTo=${encodeURIComponent('/?authed=1')}`;
+      return;
+    }
 
     const result = await res.json();
     
     if (result.success) {
       // Pass the real Google data to the audit page
       sessionStorage.setItem('auditData', JSON.stringify(result));
+      sessionStorage.removeItem(pendingScanKey);
       window.location.href = `${API_BASE}/audit`;
     } else {
-      throw new Error(result.error);
+      const details = result.reason || result.details?.error?.message || '';
+      throw new Error(details ? `${result.error} (${details})` : result.error);
     }
   } catch (err) {
     output.innerText = "▸ CRITICAL FAILURE: " + (err.message || "Connection Lost");
     output.style.color = "#ff4d4d";
     setTimeout(() => overlay.classList.remove('active'), 3000);
   }
+}
+
+function initialsFromName(name) {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'U';
+  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+async function refreshAccountUI() {
+  try {
+    const authRes = await fetch(`${API_BASE}/auth/status`, { credentials: 'include' });
+    const auth = await authRes.json();
+
+    if (auth.authenticated && auth.user) {
+      signInBtn.style.display = 'none';
+      accountMenu.style.display = 'block';
+
+      dropdownName.textContent = auth.user.displayName || 'Signed In User';
+      dropdownEmail.textContent = auth.user.email || 'Google account linked';
+
+      if (auth.user.avatar) {
+        avatarBtn.innerHTML = `<img src="${auth.user.avatar}" alt="User avatar">`;
+      } else {
+        avatarBtn.textContent = initialsFromName(auth.user.displayName);
+      }
+      return;
+    }
+  } catch (_err) {
+    // Keep default signed-out UI if status endpoint fails.
+  }
+
+  signInBtn.style.display = 'inline-flex';
+  accountMenu.style.display = 'none';
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const url = urlInput.value.trim();
+  if (!url) return;
+
+  try {
+    const authRes = await fetch(`${API_BASE}/auth/status`, { credentials: 'include' });
+    const auth = await authRes.json();
+    if (!auth.authenticated) {
+      sessionStorage.setItem(pendingScanKey, url);
+      window.location.href = `${API_BASE}/auth/google?returnTo=${encodeURIComponent('/?authed=1')}`;
+      return;
+    }
+  } catch (_err) {
+    // If auth check fails, continue and let /analyze decide.
+  }
+
+  runScan(url);
 });
+
+(async function resumePendingScanAfterAuth() {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.get('authed')) return;
+
+  const pending = sessionStorage.getItem(pendingScanKey);
+  if (!pending) return;
+
+  urlInput.value = pending;
+  const cleanUrl = window.location.pathname;
+  window.history.replaceState({}, document.title, cleanUrl);
+  runScan(pending);
+})();
+
+refreshAccountUI();
   </script>
 </body>
 </html>
