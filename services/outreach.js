@@ -58,7 +58,7 @@ async function getAuthenticMetrics(url) {
  * CALCULATE REVENUE LEAK BASED ON PSYCHOLOGICAL FRICTION
  */
 function calculateLeak(metrics, traffic = 5000, aov = 500) {
-  // Penalties based on industry standard 'Loss Aversion' data
+  // Penalties based on UX-law friction data
   const lcpPenalty = metrics.lcp > 2.5 ? (metrics.lcp - 2.5) * 0.1 : 0;
   const ttiPenalty = metrics.tti > 3000 ? (metrics.tti - 3000) / 1000 * 0.05 : 0;
   

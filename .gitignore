@@ -5,7 +5,9 @@
 # Dependency folders
 node_modules/
 dist/
+.next/
 
 # System logs & local databases
 npm-debug.log*
 leads.json
+prisma/*.db

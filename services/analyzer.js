@@ -2,6 +2,11 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const { analyzeHicksLaw } = require('./scraper');
 const { normalizeUrl } = require('../utils/url');
+const { UX_LAWS } = require('../utils/ux_laws');
+
+function clamp(value, min = 0, max = 100) {
+  return Math.min(max, Math.max(min, value));
+}
 
 function detectTechStack($) {
   const stack = new Set();
@@ -44,6 +49,10 @@ function analyzeSeo($) {
   const metaDescription = ($('meta[name="description"]').attr('content') || '').trim();
   const imagesTotal = $('img').length;
   const imagesWithAlt = $('img[alt]').length;
+  const stylesheetCount = $('link[rel="stylesheet"]').length;
+  const iconCount = $('link[rel*="icon"]').length;
+  const openGraphCount = $('meta[property^="og:"]').length;
+  const semanticLandmarkCount = $('nav, main, header, footer').length;
 
   return {
     h1_count: h1Count,
@@ -53,12 +62,27 @@ function analyzeSeo($) {
     meta_description_length: metaDescription.length,
     canonical_exists: $('link[rel="canonical"]').length > 0,
     images_total: imagesTotal,
-    images_with_alt: imagesWithAlt
+    images_with_alt: imagesWithAlt,
+    image_alt_ratio: imagesTotal > 0 ? +(imagesWithAlt / imagesTotal).toFixed(2) : 0,
+    stylesheet_count: stylesheetCount,
+    icon_count: iconCount,
+    open_graph_count: openGraphCount,
+    semantic_landmark_count: semanticLandmarkCount
   };
 }
 
-function analyzeNeuromarketing($) {
+function analyzeUxLaws($, seo, hicks, techStack) {
   const bodyText = $('body').text().toLowerCase();
+  const interactiveTargets = $('button, [role="button"], input[type="submit"], input[type="button"], a.btn, .btn').length;
+  const headings = $('h1, h2, h3').length;
+  const paragraphs = $('p').length;
+  const sections = $('section').length;
+  const lists = $('ul, ol').length;
+  const forms = $('form').length;
+  const semanticLandmarks = $('nav, main, header, footer').length;
+  const stylesheets = $('link[rel="stylesheet"]').length;
+  const icons = $('link[rel*="icon"]').length;
+  const openGraph = $('meta[property^="og:"]').length;
 
   const socialProofSelectors = [
     '[class*="testimonial"]',
@@ -71,7 +95,6 @@ function analyzeNeuromarketing($) {
 
   const hasSocialProofElement = socialProofSelectors.some((selector) => $(selector).length > 0);
   const hasSocialProofText = /testimonial|reviews?|rated|trusted by|customers|clients/.test(bodyText);
-  const urgencyTerms = ['limited', 'hurry', 'offer ends', 'only today', 'countdown'];
   const socialTerms = ['testimonial', 'review', 'rated', 'trusted by', 'customers', 'clients'];
   const authorityTerms = ['award-winning', 'certified', 'official', 'expert', 'trusted by'];
 
@@ -83,25 +106,144 @@ function analyzeNeuromarketing($) {
   }, 0);
 
   const socialProofCount = countMatches(socialTerms);
-  const urgencyCount = countMatches(urgencyTerms);
   const authorityCount = countMatches(authorityTerms);
 
-  const principles = {
-    anchoring: /original price|was\s*\$|save\s*\$|regular price|before price/.test(bodyText),
-    loss_aversion: /limited|hurry|offer ends|only today|last chance|running out/.test(bodyText),
-    decoy_effect: /most popular|best value|recommended|compare plans|pricing tiers/.test(bodyText),
-    halo_effect: /award|certified|trusted by|expert|official partner|as seen on/.test(bodyText),
-    memory_anchor: /remember|don't forget|keep in mind|note this|key takeaway/.test(bodyText)
+  const hicksScore = hicks.total === null ? 0 : clamp(100 - Math.max(0, hicks.total - 12) * 4);
+  const fittsScore = clamp(100 - Math.max(0, interactiveTargets - 6) * 8 - Math.max(0, forms - 2) * 6);
+  const jakobScore = clamp(
+    (seo.title_exists ? 15 : 0) +
+    (seo.meta_description_exists ? 15 : 0) +
+    (seo.canonical_exists ? 10 : 0) +
+    (semanticLandmarks > 0 ? 20 : 0) +
+    (techStack.length > 0 ? 15 : 0) +
+    ((interactiveTargets > 0 || forms > 0) ? 10 : 0) +
+    (bodyText.includes('trusted by') ? 5 : 0)
+  );
+  const millerScore = clamp(
+    18 +
+    Math.min(headings * 10, 30) +
+    Math.min(lists * 10, 20) +
+    Math.min(sections * 8, 20) +
+    Math.min(forms * 6, 10) -
+    Math.max(0, paragraphs - 12) * 2
+  );
+  const aestheticScore = clamp(
+    (seo.title_exists ? 10 : 0) +
+    (seo.meta_description_exists ? 10 : 0) +
+    (stylesheets > 0 ? 25 : 0) +
+    (icons > 0 ? 10 : 0) +
+    (openGraph > 0 ? 15 : 0) +
+    Math.round((seo.image_alt_ratio || 0) * 30)
+  );
+  const socialProofScore = clamp(
+    (hasSocialProofElement || hasSocialProofText ? 35 : 0) +
+    Math.min(socialProofCount * 8, 24) +
+    Math.min(authorityCount * 10, 30) +
+    (bodyText.includes('trusted by') ? 8 : 0)
+  );
+
+  const uxLaws = [
+    {
+      key: UX_LAWS[0].key,
+      label: UX_LAWS[0].label,
+      signal: UX_LAWS[0].signal,
+      score: hicksScore,
+      status: hicksScore >= 60 ? 'Pass' : 'Fail',
+      detail: hicks.total === null
+        ? 'Decision count unavailable'
+        : `${hicks.total} interactive choices detected`
+    },
+    {
+      key: UX_LAWS[1].key,
+      label: UX_LAWS[1].label,
+      signal: UX_LAWS[1].signal,
+      score: fittsScore,
+      status: fittsScore >= 60 ? 'Pass' : 'Fail',
+      detail: `${interactiveTargets} prominent hit targets detected`
+    },
+    {
+      key: UX_LAWS[2].key,
+      label: UX_LAWS[2].label,
+      signal: UX_LAWS[2].signal,
+      score: jakobScore,
+      status: jakobScore >= 60 ? 'Pass' : 'Fail',
+      detail: `${semanticLandmarks} familiar page landmarks and ${techStack.length} known platform signals`
+    },
+    {
+      key: UX_LAWS[3].key,
+      label: UX_LAWS[3].label,
+      signal: UX_LAWS[3].signal,
+      score: millerScore,
+      status: millerScore >= 60 ? 'Pass' : 'Fail',
+      detail: `${headings} headings, ${lists} lists, and ${sections} sections shaping the content chunks`
+    },
+    {
+      key: UX_LAWS[4].key,
+      label: UX_LAWS[4].label,
+      signal: UX_LAWS[4].signal,
+      score: aestheticScore,
+      status: aestheticScore >= 60 ? 'Pass' : 'Fail',
+      detail: `${stylesheets} stylesheets, ${icons} icons, ${openGraph} social tags, and ${Math.round((seo.image_alt_ratio || 0) * 100)}% image alt coverage`
+    },
+    {
+      key: UX_LAWS[5].key,
+      label: UX_LAWS[5].label,
+      signal: UX_LAWS[5].signal,
+      score: socialProofScore,
+      status: socialProofScore >= 60 ? 'Pass' : 'Fail',
+      detail: `${socialProofCount} social proof cues and ${authorityCount} authority cues`
+    }
+  ];
+
+  const chartData = {
+    labels: uxLaws.map((law) => law.label),
+    datasets: [{
+      label: 'UX Law Score',
+      data: uxLaws.map((law) => law.score),
+      borderColor: '#d4af37',
+      backgroundColor: 'rgba(212, 175, 55, 0.16)',
+      pointBackgroundColor: '#ffd700',
+      pointBorderColor: '#0d0d0d',
+      pointHoverBackgroundColor: '#ffffff',
+      pointHoverBorderColor: '#d4af37'
+    }]
   };
 
   return {
     social_proof: hasSocialProofElement || hasSocialProofText,
-    urgency_cues: /limited time|hurry|offer ends|only today|countdown/.test(bodyText),
-    cta_buttons: $('button, a.btn, [role="button"]').length,
+    cta_buttons: interactiveTargets,
     social_proof_count: socialProofCount,
-    urgency_count: urgencyCount,
     authority_count: authorityCount,
-    principles
+    ux_laws: uxLaws,
+    chartData
+  };
+}
+
+function createBlockedUxLaws() {
+  const uxLaws = UX_LAWS.map((law) => ({
+    key: law.key,
+    label: law.label,
+    signal: law.signal,
+    score: 0,
+    status: 'Fail',
+    detail: 'Analysis unavailable'
+  }));
+
+  return {
+    ux_laws: uxLaws,
+    chartData: {
+      labels: uxLaws.map((law) => law.label),
+      datasets: [{
+        label: 'UX Law Score',
+        data: uxLaws.map(() => 0),
+        borderColor: '#d4af37',
+        backgroundColor: 'rgba(212, 175, 55, 0.16)',
+        pointBackgroundColor: '#ffd700',
+        pointBorderColor: '#0d0d0d',
+        pointHoverBackgroundColor: '#ffffff',
+        pointHoverBorderColor: '#d4af37'
+      }]
+    }
   };
 }
 
@@ -118,17 +260,21 @@ async function analyzeSite(url) {
     ]);
 
     const $ = cheerio.load(data);
-    const neuro = analyzeNeuromarketing($);
-    neuro.principles.hicks_law = hicks.total === null ? null : hicks.total <= 12;
+    const techStack = detectTechStack($);
+    const seo = analyzeSeo($);
+    const ux = analyzeUxLaws($, seo, hicks, techStack);
 
     return {
       status: 'SUCCESS',
-      seo: analyzeSeo($),
+      seo,
       hicks,
-      neuromarketing: neuro,
-      tech_stack: detectTechStack($)
+      tech_stack: techStack,
+      ux_laws: ux.ux_laws,
+      chartData: ux.chartData
     };
   } catch (error) {
+    const blockedUx = createBlockedUxLaws();
+
     return {
       status: 'BLOCKED',
       seo: {
@@ -139,7 +285,12 @@ async function analyzeSite(url) {
         meta_description_length: 0,
         canonical_exists: false,
         images_total: 0,
-        images_with_alt: 0
+        images_with_alt: 0,
+        image_alt_ratio: 0,
+        stylesheet_count: 0,
+        icon_count: 0,
+        open_graph_count: 0,
+        semantic_landmark_count: 0
       },
       hicks: {
         links: null,
@@ -150,23 +301,9 @@ async function analyzeSite(url) {
         risk: 'unknown',
         status: 'BLOCKED'
       },
-      neuromarketing: {
-        social_proof: false,
-        urgency_cues: false,
-        cta_buttons: 0,
-        social_proof_count: 0,
-        urgency_count: 0,
-        authority_count: 0,
-        principles: {
-          anchoring: false,
-          loss_aversion: false,
-          decoy_effect: false,
-          hicks_law: null,
-          halo_effect: false,
-          memory_anchor: false
-        }
-      },
       tech_stack: [],
+      ux_laws: blockedUx.ux_laws,
+      chartData: blockedUx.chartData,
       error: error.message
     };
   }

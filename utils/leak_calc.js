@@ -1,83 +1,93 @@
-// File: utils/leak_calc.js
-/**
- * Friction-Slayer Revenue Leak Calculator — Scientific Edition
- * Psychological Trigger: Loss Aversion via granular, auditable breakdown
- */
+function calculateBrandLoss({ traffic, aov, conversionRate, brandAuthorityScore }) {
+    const safeTraffic = Number.isFinite(traffic) ? traffic : 0;
+    const safeAov = Number.isFinite(aov) ? aov : 0;
+    const safeConversionRate = Number.isFinite(conversionRate) ? conversionRate : 0;
+    const score = Number.isFinite(brandAuthorityScore) ? brandAuthorityScore : 0;
+
+    const currentMonthlyRevenue = safeTraffic * safeConversionRate * safeAov;
+    const trustPenaltyRate = score < 60 ? 0.30 : 0;
+    const monthlyTrustLoss = Math.round(currentMonthlyRevenue * trustPenaltyRate);
+
+    const premiumAov = safeAov * 1.20;
+    const premiumMonthlyRevenue = safeTraffic * safeConversionRate * premiumAov;
+    const monthlyBrandPremiumGap = Math.round(Math.max(0, premiumMonthlyRevenue - currentMonthlyRevenue));
+
+    return {
+        trust_penalty_applied: trustPenaltyRate > 0,
+        trust_penalty_rate: Math.round(trustPenaltyRate * 100),
+        monthly_trust_loss: monthlyTrustLoss,
+        annual_trust_loss: monthlyTrustLoss * 12,
+        monthly_brand_premium_gap: monthlyBrandPremiumGap,
+        annual_brand_premium_gap: monthlyBrandPremiumGap * 12,
+        annual_brand_debt: (monthlyTrustLoss + monthlyBrandPremiumGap) * 12
+    };
+}
+
+exports.calculateBrandLoss = calculateBrandLoss;
+
 exports.calculateLeak = (metrics) => {
-    const traffic = metrics.traffic ?? 5000;   // Monthly visitors
-    const aov     = metrics.aov ?? 50;         // Average Order Value ($)
-    const convBase = 0.02;                     // 2% industry baseline conversion rate
-
-    // Baseline monthly revenue without friction
+    const traffic = metrics.traffic ?? 5000;
+    const aov = metrics.aov ?? 50;
+    const convBase = 0.02;
     const baselineMonthlyRevenue = traffic * convBase * aov;
-
+    const uxLaws = Array.isArray(metrics.ux_laws) ? metrics.ux_laws : [];
+    const brandAuthorityScore = Number.isFinite(metrics.brand_authority_score) ? metrics.brand_authority_score : 0;
     const breakdown = [];
-    let totalPenaltyRate = 0;
+    let failCount = 0;
+    let abandonmentRate = 0.18;
 
-    // ── Penalty 1: LCP > 2.5s → -15% Conversion ──────────────────────────
-    if (metrics.lcp === null || metrics.lcp === undefined || metrics.lcp > 2.5) {
-        const rate  = 0.15;
-        const loss  = Math.round(baselineMonthlyRevenue * rate);
-        totalPenaltyRate += rate;
+    uxLaws.forEach((law) => {
+        const failed = law && (law.status === 'Fail' || law.passed === false || (Number.isFinite(law.score) && law.score < 60));
+        if (!failed) return;
+
+        failCount += 1;
+
+        if (law.label === 'Social Proof + Authority') {
+            abandonmentRate *= 2;
+        }
+
+        const penaltyRate = law.label === 'Social Proof + Authority'
+            ? 0.15 + abandonmentRate
+            : 0.15;
+        const monthlyLoss = Math.round(baselineMonthlyRevenue * penaltyRate);
+
         breakdown.push({
-            issue:       'Slow Page Load (LCP)',
-            detail:      `LCP of ${metrics.lcp ? metrics.lcp.toFixed(2) + 's' : 'unknown'} exceeds 2.5 s threshold`,
-            penaltyRate: rate,
-            monthlyLoss: loss,
+            issue: law.label,
+            detail: law.detail || `${law.label} failed the UX audit.`,
+            penaltyRate: Math.round(penaltyRate * 100),
+            monthlyLoss
         });
-    }
+    });
 
-    // ── Penalty 2: No H1 or multiple H1s → -5% SEO Visibility ────────────
-    const seo = metrics.seo || {};
-    if (seo.h1_count !== 1) {
-        const rate  = 0.05;
-        const loss  = Math.round(baselineMonthlyRevenue * rate);
-        totalPenaltyRate += rate;
-        breakdown.push({
-            issue:       'Missing / Duplicate H1 Tag',
-            detail:      `${seo.h1_count ?? 0} H1 tag(s) found — should be exactly 1`,
-            penaltyRate: rate,
-            monthlyLoss: loss,
-        });
-    }
+    const monthlyExposure = breakdown.reduce((sum, item) => sum + item.monthlyLoss, 0);
+    const annualLeak = monthlyExposure * 12;
+    const leakRate = baselineMonthlyRevenue > 0 ? (monthlyExposure / baselineMonthlyRevenue) * 100 : 0;
 
-    // ── Penalty 3: No Meta Description → -5% CTR ─────────────────────────
-    if (!seo.meta_description_exists) {
-        const rate  = 0.05;
-        const loss  = Math.round(baselineMonthlyRevenue * rate);
-        totalPenaltyRate += rate;
-        breakdown.push({
-            issue:       'Missing Meta Description',
-            detail:      'No meta description reduces organic click-through rate by ~5 %',
-            penaltyRate: rate,
-            monthlyLoss: loss,
-        });
-    }
-
-    // ── Penalty 4: Low Social Proof → -10% Trust Factor ──────────────────
-    const neuro = metrics.neuromarketing || {};
-    if (!neuro.social_proof) {
-        const rate  = 0.10;
-        const loss  = Math.round(baselineMonthlyRevenue * rate);
-        totalPenaltyRate += rate;
-        breakdown.push({
-            issue:       'No Social Proof Signals',
-            detail:      'Missing reviews, testimonials, or client signals reduce trust by ~10 %',
-            penaltyRate: rate,
-            monthlyLoss: loss,
-        });
-    }
-
-    const monthlyExposure = Math.round(baselineMonthlyRevenue * totalPenaltyRate);
-    const annualLeak      = monthlyExposure * 12;
+    const brandLoss = calculateBrandLoss({
+        traffic,
+        aov,
+        conversionRate: convBase,
+        brandAuthorityScore
+    });
 
     return {
         annualLeak,
         monthlyExposure,
-        dailyLoss:             +(monthlyExposure / 30).toFixed(2),
-        totalPenaltyRate:      Math.round(totalPenaltyRate * 100),
+        dailyLoss: +(monthlyExposure / 30).toFixed(2),
+        leakAmount: +(monthlyExposure / 30).toFixed(2),
+        totalPenaltyRate: Math.round(leakRate),
         baselineMonthlyRevenue: Math.round(baselineMonthlyRevenue),
+        abandonmentRate: Math.round(abandonmentRate * 100),
+        failCount,
         breakdown,
-        isVulnerable:          totalPenaltyRate > 0,
+        isVulnerable: failCount > 0,
+        brand_authority_score: brandAuthorityScore,
+        annual_brand_debt: brandLoss.annual_brand_debt,
+        monthly_brand_premium_gap: brandLoss.monthly_brand_premium_gap,
+        annual_brand_premium_gap: brandLoss.annual_brand_premium_gap,
+        trust_penalty_applied: brandLoss.trust_penalty_applied,
+        trust_penalty_rate: brandLoss.trust_penalty_rate,
+        monthly_trust_loss: brandLoss.monthly_trust_loss,
+        annual_trust_loss: brandLoss.annual_trust_loss
     };
 };

@@ -195,13 +195,13 @@ app.post('/analyze', ensureAuthenticated, async (req, res) => {
     console.log(`[SYSTEM] Engaging Google V8 for: ${url}`);
 
     const [analysisResult, cwvResult] = await Promise.allSettled([
-      analyzeSite(url).catch(() => ({ status: 'BLOCKED', seo: null, hicks: null, neuromarketing: null, tech_stack: [] })),
+      analyzeSite(url).catch(() => ({ status: 'BLOCKED', seo: null, hicks: null, tech_stack: [], ux_laws: [], chartData: null })),
       getPageSpeedMetrics(url)
     ]);
 
     const analysis = analysisResult.status === 'fulfilled'
       ? analysisResult.value
-      : { status: 'BLOCKED', seo: null, hicks: null, neuromarketing: null, tech_stack: [] };
+      : { status: 'BLOCKED', seo: null, hicks: null, tech_stack: [], ux_laws: [], chartData: null };
 
     const cwv = cwvResult.status === 'fulfilled'
       ? cwvResult.value
@@ -229,7 +229,10 @@ app.post('/analyze', ensureAuthenticated, async (req, res) => {
       lcp: cwv.lcp,
       tti: cwv.tti,
       seo: analysis.seo,
-      neuromarketing: analysis.neuromarketing,
+      ux_laws: analysis.ux_laws,
+      brand_authority_score: analysis && analysis.brand_audit && analysis.brand_audit.brand_authority_score
+        ? analysis.brand_audit.brand_authority_score.score
+        : 0,
     });
 
     let overallStatus = 'Excellent';
@@ -242,6 +245,7 @@ app.post('/analyze', ensureAuthenticated, async (req, res) => {
       metrics: cwv,
       ga4,
       analysis,
+      chartData: analysis.chartData || null,
       report,
       status: 'VERIFIED_BY_GOOGLE',
       overallStatus,
