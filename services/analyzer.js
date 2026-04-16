@@ -1,311 +1,237 @@
-const axios = require('axios');
-const cheerio = require('cheerio');
-const { analyzeHicksLaw } = require('./scraper');
+const { chromium } = require('playwright-chromium');
 const { normalizeUrl } = require('../utils/url');
 const { UX_LAWS } = require('../utils/ux_laws');
 
-function clamp(value, min = 0, max = 100) {
-  return Math.min(max, Math.max(min, value));
+function scoreWithWeight(count, weight) {
+  return Math.min(100, Math.round(count * weight * 10));
 }
 
-function detectTechStack($) {
-  const stack = new Set();
-
-  const scripts = $('script[src]')
-    .map((_, el) => ($(el).attr('src') || '').toLowerCase())
-    .get();
-
-  const html = $.html().toLowerCase();
-
-  if (scripts.some((src) => src.includes('wp-') || src.includes('wordpress'))) {
-    stack.add('WordPress');
-  }
-  if (scripts.some((src) => src.includes('shopify'))) {
-    stack.add('Shopify');
-  }
-  if (scripts.some((src) => src.includes('wix'))) {
-    stack.add('Wix');
-  }
-  if (scripts.some((src) => src.includes('webflow'))) {
-    stack.add('Webflow');
-  }
-  if (scripts.some((src) => src.includes('react')) || html.includes('__next')) {
-    stack.add('React');
-  }
-  if (html.includes('ng-app') || html.includes('angular')) {
-    stack.add('Angular');
-  }
-  if (html.includes('vue')) {
-    stack.add('Vue');
-  }
-
-  return Array.from(stack);
-}
-
-function analyzeSeo($) {
-  const h1Count = $('h1').length;
-  const metaDescriptionExists = $('meta[name="description"]').length > 0;
-  const titleText = $('title').text().trim();
-  const metaDescription = ($('meta[name="description"]').attr('content') || '').trim();
-  const imagesTotal = $('img').length;
-  const imagesWithAlt = $('img[alt]').length;
-  const stylesheetCount = $('link[rel="stylesheet"]').length;
-  const iconCount = $('link[rel*="icon"]').length;
-  const openGraphCount = $('meta[property^="og:"]').length;
-  const semanticLandmarkCount = $('nav, main, header, footer').length;
-
-  return {
-    h1_count: h1Count,
-    meta_description_exists: metaDescriptionExists,
-    title_exists: $('title').length > 0,
-    title_length: titleText.length,
-    meta_description_length: metaDescription.length,
-    canonical_exists: $('link[rel="canonical"]').length > 0,
-    images_total: imagesTotal,
-    images_with_alt: imagesWithAlt,
-    image_alt_ratio: imagesTotal > 0 ? +(imagesWithAlt / imagesTotal).toFixed(2) : 0,
-    stylesheet_count: stylesheetCount,
-    icon_count: iconCount,
-    open_graph_count: openGraphCount,
-    semantic_landmark_count: semanticLandmarkCount
-  };
-}
-
-function analyzeUxLaws($, seo, hicks, techStack) {
-  const bodyText = $('body').text().toLowerCase();
-  const interactiveTargets = $('button, [role="button"], input[type="submit"], input[type="button"], a.btn, .btn').length;
-  const headings = $('h1, h2, h3').length;
-  const paragraphs = $('p').length;
-  const sections = $('section').length;
-  const lists = $('ul, ol').length;
-  const forms = $('form').length;
-  const semanticLandmarks = $('nav, main, header, footer').length;
-  const stylesheets = $('link[rel="stylesheet"]').length;
-  const icons = $('link[rel*="icon"]').length;
-  const openGraph = $('meta[property^="og:"]').length;
-
-  const socialProofSelectors = [
-    '[class*="testimonial"]',
-    '[id*="testimonial"]',
-    '[class*="review"]',
-    '[id*="review"]',
-    '[class*="rating"]',
-    '[id*="rating"]'
-  ];
-
-  const hasSocialProofElement = socialProofSelectors.some((selector) => $(selector).length > 0);
-  const hasSocialProofText = /testimonial|reviews?|rated|trusted by|customers|clients/.test(bodyText);
-  const socialTerms = ['testimonial', 'review', 'rated', 'trusted by', 'customers', 'clients'];
-  const authorityTerms = ['award-winning', 'certified', 'official', 'expert', 'trusted by'];
-
-  const countMatches = (terms) => terms.reduce((sum, term) => {
-    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(escaped, 'g');
-    const found = bodyText.match(regex);
-    return sum + (found ? found.length : 0);
-  }, 0);
-
-  const socialProofCount = countMatches(socialTerms);
-  const authorityCount = countMatches(authorityTerms);
-
-  const hicksScore = hicks.total === null ? 0 : clamp(100 - Math.max(0, hicks.total - 12) * 4);
-  const fittsScore = clamp(100 - Math.max(0, interactiveTargets - 6) * 8 - Math.max(0, forms - 2) * 6);
-  const jakobScore = clamp(
-    (seo.title_exists ? 15 : 0) +
-    (seo.meta_description_exists ? 15 : 0) +
-    (seo.canonical_exists ? 10 : 0) +
-    (semanticLandmarks > 0 ? 20 : 0) +
-    (techStack.length > 0 ? 15 : 0) +
-    ((interactiveTargets > 0 || forms > 0) ? 10 : 0) +
-    (bodyText.includes('trusted by') ? 5 : 0)
-  );
-  const millerScore = clamp(
-    18 +
-    Math.min(headings * 10, 30) +
-    Math.min(lists * 10, 20) +
-    Math.min(sections * 8, 20) +
-    Math.min(forms * 6, 10) -
-    Math.max(0, paragraphs - 12) * 2
-  );
-  const aestheticScore = clamp(
-    (seo.title_exists ? 10 : 0) +
-    (seo.meta_description_exists ? 10 : 0) +
-    (stylesheets > 0 ? 25 : 0) +
-    (icons > 0 ? 10 : 0) +
-    (openGraph > 0 ? 15 : 0) +
-    Math.round((seo.image_alt_ratio || 0) * 30)
-  );
-  const socialProofScore = clamp(
-    (hasSocialProofElement || hasSocialProofText ? 35 : 0) +
-    Math.min(socialProofCount * 8, 24) +
-    Math.min(authorityCount * 10, 30) +
-    (bodyText.includes('trusted by') ? 8 : 0)
-  );
-
-  const uxLaws = [
-    {
-      key: UX_LAWS[0].key,
-      label: UX_LAWS[0].label,
-      signal: UX_LAWS[0].signal,
-      score: hicksScore,
-      status: hicksScore >= 60 ? 'Pass' : 'Fail',
-      detail: hicks.total === null
-        ? 'Decision count unavailable'
-        : `${hicks.total} interactive choices detected`
-    },
-    {
-      key: UX_LAWS[1].key,
-      label: UX_LAWS[1].label,
-      signal: UX_LAWS[1].signal,
-      score: fittsScore,
-      status: fittsScore >= 60 ? 'Pass' : 'Fail',
-      detail: `${interactiveTargets} prominent hit targets detected`
-    },
-    {
-      key: UX_LAWS[2].key,
-      label: UX_LAWS[2].label,
-      signal: UX_LAWS[2].signal,
-      score: jakobScore,
-      status: jakobScore >= 60 ? 'Pass' : 'Fail',
-      detail: `${semanticLandmarks} familiar page landmarks and ${techStack.length} known platform signals`
-    },
-    {
-      key: UX_LAWS[3].key,
-      label: UX_LAWS[3].label,
-      signal: UX_LAWS[3].signal,
-      score: millerScore,
-      status: millerScore >= 60 ? 'Pass' : 'Fail',
-      detail: `${headings} headings, ${lists} lists, and ${sections} sections shaping the content chunks`
-    },
-    {
-      key: UX_LAWS[4].key,
-      label: UX_LAWS[4].label,
-      signal: UX_LAWS[4].signal,
-      score: aestheticScore,
-      status: aestheticScore >= 60 ? 'Pass' : 'Fail',
-      detail: `${stylesheets} stylesheets, ${icons} icons, ${openGraph} social tags, and ${Math.round((seo.image_alt_ratio || 0) * 100)}% image alt coverage`
-    },
-    {
-      key: UX_LAWS[5].key,
-      label: UX_LAWS[5].label,
-      signal: UX_LAWS[5].signal,
-      score: socialProofScore,
-      status: socialProofScore >= 60 ? 'Pass' : 'Fail',
-      detail: `${socialProofCount} social proof cues and ${authorityCount} authority cues`
-    }
-  ];
-
-  const chartData = {
-    labels: uxLaws.map((law) => law.label),
-    datasets: [{
-      label: 'UX Law Score',
-      data: uxLaws.map((law) => law.score),
-      borderColor: '#d4af37',
-      backgroundColor: 'rgba(212, 175, 55, 0.16)',
-      pointBackgroundColor: '#ffd700',
-      pointBorderColor: '#0d0d0d',
-      pointHoverBackgroundColor: '#ffffff',
-      pointHoverBorderColor: '#d4af37'
-    }]
-  };
-
-  return {
-    social_proof: hasSocialProofElement || hasSocialProofText,
-    cta_buttons: interactiveTargets,
-    social_proof_count: socialProofCount,
-    authority_count: authorityCount,
-    ux_laws: uxLaws,
-    chartData
-  };
-}
-
-function createBlockedUxLaws() {
-  const uxLaws = UX_LAWS.map((law) => ({
-    key: law.key,
-    label: law.label,
-    signal: law.signal,
+function blockedResponse(message) {
+  const uxLaws = Object.entries(UX_LAWS).map(([name, meta]) => ({
+    key: name,
+    label: name,
+    signal: meta.signal,
+    weight: meta.weight,
     score: 0,
     status: 'Fail',
     detail: 'Analysis unavailable'
   }));
 
   return {
+    status: 'BLOCKED',
+    seo: {
+      h1_count: 0,
+      meta_description_exists: false,
+      title_exists: false,
+      title_length: 0,
+      meta_description_length: 0,
+      canonical_exists: false,
+      images_total: 0,
+      images_with_alt: 0,
+      image_alt_ratio: 0,
+      stylesheet_count: 0,
+      icon_count: 0,
+      open_graph_count: 0,
+      semantic_landmark_count: 0
+    },
+    hicks: {
+      links: 0,
+      buttons: 0,
+      inputs: 0,
+      total: 0,
+      verdict: 'Unavailable',
+      risk: 'unknown',
+      status: 'BLOCKED'
+    },
+    tech_stack: [],
+    lab_metrics: null,
     ux_laws: uxLaws,
     chartData: {
       labels: uxLaws.map((law) => law.label),
       datasets: [{
         label: 'UX Law Score',
-        data: uxLaws.map(() => 0),
+        data: uxLaws.map((law) => law.score),
         borderColor: '#d4af37',
-        backgroundColor: 'rgba(212, 175, 55, 0.16)',
-        pointBackgroundColor: '#ffd700',
-        pointBorderColor: '#0d0d0d',
-        pointHoverBackgroundColor: '#ffffff',
-        pointHoverBorderColor: '#d4af37'
+        backgroundColor: 'rgba(212, 175, 55, 0.16)'
       }]
-    }
+    },
+    error: message
   };
 }
 
 async function analyzeSite(url) {
-  const cleanUrl = normalizeUrl(url);
+  const normalizedUrl = normalizeUrl(url);
+  if (!normalizedUrl) return blockedResponse('Invalid URL');
+
+  const browser = await chromium.launch({ headless: true });
 
   try {
-    const [{ data }, hicks] = await Promise.all([
-      axios.get(cleanUrl, {
-        timeout: 7000,
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-      }),
-      analyzeHicksLaw(cleanUrl)
-    ]);
+    const context = await browser.newContext();
+    const page = await context.newPage();
 
-    const $ = cheerio.load(data);
-    const techStack = detectTechStack($);
-    const seo = analyzeSeo($);
-    const ux = analyzeUxLaws($, seo, hicks, techStack);
+    await page.goto(normalizedUrl, { waitUntil: "networkidle", timeout: 30000 });
+
+    const metrics = await page.evaluate(() => {
+      const nav = performance.getEntriesByType('navigation')[0] || null;
+      const paints = performance.getEntriesByType('paint') || [];
+      const fcpEntry = paints.find((p) => p.name === 'first-contentful-paint');
+      const lcpEntries = performance.getEntriesByType('largest-contentful-paint') || [];
+      const lcpEntry = lcpEntries.length ? lcpEntries[lcpEntries.length - 1] : null;
+      const clsEntries = performance.getEntriesByType('layout-shift') || [];
+      const clsValue = clsEntries
+        .filter((e) => !e.hadRecentInput)
+        .reduce((sum, e) => sum + (Number(e.value) || 0), 0);
+
+      const scriptSrc = Array.from(document.querySelectorAll('script[src]'))
+        .map((s) => s.src.toLowerCase());
+      const linkHref = Array.from(document.querySelectorAll('link[href]'))
+        .map((l) => l.href.toLowerCase());
+      const html = document.documentElement.innerHTML.toLowerCase();
+      const hostBlob = scriptSrc.concat(linkHref).join(' ') + ' ' + html;
+
+      const stack = [];
+      const pushStack = (name, condition) => {
+        if (condition && !stack.includes(name)) stack.push(name);
+      };
+
+      pushStack('Shopify', !!window.Shopify || hostBlob.includes('cdn.shopify.com') || hostBlob.includes('/shopify/'));
+      pushStack('WordPress', hostBlob.includes('wp-content') || hostBlob.includes('wp-includes') || hostBlob.includes('wordpress'));
+      pushStack('React', !!window.React || !!document.querySelector('[data-reactroot], [data-reactid]'));
+      pushStack('Vue', !!window.Vue || !!document.querySelector('[data-v-]'));
+      pushStack('Angular', !!window.ng || !!document.querySelector('[ng-version]'));
+      pushStack('jQuery', !!window.jQuery || hostBlob.includes('jquery'));
+      pushStack('Bootstrap', hostBlob.includes('bootstrap'));
+      pushStack('Tailwind', hostBlob.includes('tailwind'));
+      pushStack('Google Tag Manager', hostBlob.includes('googletagmanager.com/gtm.js'));
+      pushStack('Cloudflare', hostBlob.includes('cloudflare'));
+
+      const fcpMs = Number.isFinite(fcpEntry?.startTime) ? fcpEntry.startTime : null;
+      const lcpMs = Number.isFinite(lcpEntry?.startTime) ? lcpEntry.startTime : null;
+      const ttiMs = Number.isFinite(nav?.domInteractive) ? nav.domInteractive : null;
+
+      let perfScoreApprox = null;
+      if (Number.isFinite(lcpMs) || Number.isFinite(fcpMs) || Number.isFinite(ttiMs)) {
+        const lcpPenalty = Number.isFinite(lcpMs) ? Math.min(50, Math.max(0, (lcpMs - 2500) / 120)) : 16;
+        const fcpPenalty = Number.isFinite(fcpMs) ? Math.min(20, Math.max(0, (fcpMs - 1800) / 140)) : 8;
+        const ttiPenalty = Number.isFinite(ttiMs) ? Math.min(25, Math.max(0, (ttiMs - 3500) / 220)) : 10;
+        const clsPenalty = Number.isFinite(clsValue) ? Math.min(15, Math.max(0, clsValue * 100)) : 6;
+        perfScoreApprox = Math.max(0, Math.round(100 - lcpPenalty - fcpPenalty - ttiPenalty - clsPenalty));
+      }
+
+      const links = document.querySelectorAll('a').length;
+      const buttons = document.querySelectorAll('button, [role="button"], input[type="button"], input[type="submit"]').length;
+      const inputs = document.querySelectorAll('input, select, textarea').length;
+      const urgencySignals = document.querySelectorAll('timer, .timer').length + (document.body?.innerText || '').toLowerCase().split('limited time').length - 1 + (document.body?.innerText || '').toLowerCase().split('left in stock').length - 1;
+      const pricingSignals = document.querySelectorAll('.pricing-table, .tier-mid').length;
+
+      return {
+        links,
+        buttons,
+        inputs,
+        urgencySignals,
+        pricingSignals,
+        h1_count: document.querySelectorAll('h1').length,
+        meta_description_exists: !!document.querySelector('meta[name="description"]'),
+        title_exists: !!document.querySelector('title'),
+        title_length: (document.querySelector('title')?.textContent || '').trim().length,
+        meta_description_length: (document.querySelector('meta[name="description"]')?.getAttribute('content') || '').trim().length,
+        canonical_exists: !!document.querySelector('link[rel="canonical"]'),
+        images_total: document.querySelectorAll('img').length,
+        images_with_alt: document.querySelectorAll('img[alt]').length,
+        stylesheet_count: document.querySelectorAll('link[rel="stylesheet"]').length,
+        icon_count: document.querySelectorAll('link[rel*="icon"]').length,
+        open_graph_count: document.querySelectorAll('meta[property^="og:"]').length,
+        semantic_landmark_count: document.querySelectorAll('nav, main, header, footer').length,
+        tech_stack: stack,
+        lab_metrics: {
+          lcp: Number.isFinite(lcpMs) ? +(lcpMs / 1000).toFixed(2) : null,
+          fcp: Number.isFinite(fcpMs) ? +(fcpMs / 1000).toFixed(2) : null,
+          tti: Number.isFinite(ttiMs) ? Math.round(ttiMs) : null,
+          cls: Number.isFinite(clsValue) ? +clsValue.toFixed(3) : null,
+          speedIndex: null,
+          performanceScore: Number.isFinite(perfScoreApprox) ? perfScoreApprox : null
+        }
+      };
+    });
+
+    await context.close();
+
+    const hicksCount = metrics.links + metrics.buttons + metrics.inputs;
+    const uxLaws = [
+      {
+        key: 'HicksLaw',
+        label: 'HicksLaw',
+        signal: UX_LAWS.HicksLaw.signal,
+        weight: UX_LAWS.HicksLaw.weight,
+        score: scoreWithWeight(hicksCount, UX_LAWS.HicksLaw.weight),
+        status: scoreWithWeight(hicksCount, UX_LAWS.HicksLaw.weight) >= 60 ? 'Pass' : 'Fail',
+        detail: `${hicksCount} navigation complexity signals detected`
+      },
+      {
+        key: 'LossAversion',
+        label: 'LossAversion',
+        signal: UX_LAWS.LossAversion.signal,
+        weight: UX_LAWS.LossAversion.weight,
+        score: scoreWithWeight(metrics.urgencySignals, UX_LAWS.LossAversion.weight),
+        status: scoreWithWeight(metrics.urgencySignals, UX_LAWS.LossAversion.weight) >= 60 ? 'Pass' : 'Fail',
+        detail: `${metrics.urgencySignals} urgency markers detected`
+      },
+      {
+        key: 'DecoyEffect',
+        label: 'DecoyEffect',
+        signal: UX_LAWS.DecoyEffect.signal,
+        weight: UX_LAWS.DecoyEffect.weight,
+        score: scoreWithWeight(metrics.pricingSignals, UX_LAWS.DecoyEffect.weight),
+        status: scoreWithWeight(metrics.pricingSignals, UX_LAWS.DecoyEffect.weight) >= 60 ? 'Pass' : 'Fail',
+        detail: `${metrics.pricingSignals} pricing decoy markers detected`
+      }
+    ];
+
+    const risk = hicksCount > 20 ? 'high' : hicksCount > 12 ? 'medium' : 'low';
 
     return {
       status: 'SUCCESS',
-      seo,
-      hicks,
-      tech_stack: techStack,
-      ux_laws: ux.ux_laws,
-      chartData: ux.chartData
-    };
-  } catch (error) {
-    const blockedUx = createBlockedUxLaws();
-
-    return {
-      status: 'BLOCKED',
       seo: {
-        h1_count: 0,
-        meta_description_exists: false,
-        title_exists: false,
-        title_length: 0,
-        meta_description_length: 0,
-        canonical_exists: false,
-        images_total: 0,
-        images_with_alt: 0,
-        image_alt_ratio: 0,
-        stylesheet_count: 0,
-        icon_count: 0,
-        open_graph_count: 0,
-        semantic_landmark_count: 0
+        h1_count: metrics.h1_count,
+        meta_description_exists: metrics.meta_description_exists,
+        title_exists: metrics.title_exists,
+        title_length: metrics.title_length,
+        meta_description_length: metrics.meta_description_length,
+        canonical_exists: metrics.canonical_exists,
+        images_total: metrics.images_total,
+        images_with_alt: metrics.images_with_alt,
+        image_alt_ratio: metrics.images_total > 0 ? +(metrics.images_with_alt / metrics.images_total).toFixed(2) : 0,
+        stylesheet_count: metrics.stylesheet_count,
+        icon_count: metrics.icon_count,
+        open_graph_count: metrics.open_graph_count,
+        semantic_landmark_count: metrics.semantic_landmark_count
       },
       hicks: {
-        links: null,
-        buttons: null,
-        inputs: null,
-        total: null,
-        verdict: 'Unavailable',
-        risk: 'unknown',
-        status: 'BLOCKED'
+        links: metrics.links,
+        buttons: metrics.buttons,
+        inputs: metrics.inputs,
+        total: hicksCount,
+        verdict: hicksCount > 20 ? 'Decision Paralysis' : hicksCount > 12 ? 'Needs Simplification' : 'Clear Decision Path',
+        risk,
+        status: 'SUCCESS'
       },
-      tech_stack: [],
-      ux_laws: blockedUx.ux_laws,
-      chartData: blockedUx.chartData,
-      error: error.message
+      tech_stack: Array.isArray(metrics.tech_stack) ? metrics.tech_stack : [],
+      lab_metrics: metrics.lab_metrics || null,
+      ux_laws: uxLaws,
+      chartData: {
+        labels: uxLaws.map((law) => law.label),
+        datasets: [{
+          label: 'UX Law Score',
+          data: uxLaws.map((law) => law.score),
+          borderColor: '#d4af37',
+          backgroundColor: 'rgba(212, 175, 55, 0.16)'
+        }]
+      }
     };
+  } catch (error) {
+    return blockedResponse(error.message);
+  } finally {
+    await browser.close();
   }
 }
 

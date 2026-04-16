@@ -1,18 +1,35 @@
-require('dotenv').config();
-const express = require('express'), path = require('path');
+const dotenv = require('dotenv');
+
+dotenv.config({ override: true });
+
+const express = require('express');
+const path = require('path');
 const axios = require('axios');
 const passport = require('passport');
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
 const session = require('express-session');
+const { chromium } = require('playwright-chromium');
 const { analyzeSite } = require('./services/analyzer');
 const { getPageSpeedMetrics } = require('./services/pagespeed');
 const { calculateLeak } = require('./utils/leak_calc');
+
 const { env } = require('./config/env');
 
-const app = express(), PORT = env.PORT;
+const app = express();
+const PORT = env.PORT;
+let browser = null;
 
 app.use(express.json(), express.urlencoded({ extended: true }));
-app.use(session({ secret: env.SESSION_SECRET, resave: false, saveUninitialized: true }));
+app.use(session({
+  secret: env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
+  }
+}));
 app.use(passport.initialize());
 app.use(passport.session());
 app.use((req, res, next) => {
@@ -99,15 +116,23 @@ function fallbackGa4Data() {
   };
 }
 
-passport.use(new GoogleStrategy({
-    clientID: env.GOOGLE_CLIENT_ID,
-    clientSecret: env.GOOGLE_CLIENT_SECRET,
-    callbackURL: env.GOOGLE_CALLBACK_URL
-  },
-  function(accessToken, refreshToken, profile, cb) {
-    return cb(null, { profile, accessToken });
-  }
-));
+const hasGoogleOAuthConfig = Boolean(
+  env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_CALLBACK_URL
+);
+
+if (hasGoogleOAuthConfig) {
+  passport.use(new GoogleStrategy({
+      clientID: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
+      callbackURL: env.GOOGLE_CALLBACK_URL
+    },
+    function(accessToken, refreshToken, profile, cb) {
+      return cb(null, { profile, accessToken });
+    }
+  ));
+} else {
+  console.warn('[AUTH DISABLED] Missing Google OAuth environment variables.');
+}
 
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
@@ -127,6 +152,10 @@ app.get('/auth/status', (req, res) => {
 });
 
 app.get('/auth/google', (req, res, next) => {
+  if (!hasGoogleOAuthConfig) {
+    return res.status(503).json({ error: 'Google OAuth is not configured on this server.' });
+  }
+
   const returnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : '/';
   req.session.returnTo = returnTo;
   passport.authenticate('google', {
@@ -135,6 +164,12 @@ app.get('/auth/google', (req, res, next) => {
 });
 
 app.get('/auth/google/callback',
+  (req, res, next) => {
+    if (!hasGoogleOAuthConfig) {
+      return res.status(503).json({ error: 'Google OAuth is not configured on this server.' });
+    }
+    return next();
+  },
   passport.authenticate('google', { failureRedirect: '/auth/google' }),
   (req, res) => {
     const returnTo = req.session.returnTo || '/';
@@ -203,9 +238,16 @@ app.post('/analyze', ensureAuthenticated, async (req, res) => {
       ? analysisResult.value
       : { status: 'BLOCKED', seo: null, hicks: null, tech_stack: [], ux_laws: [], chartData: null };
 
+    const analysisLabMetrics = analysis && analysis.lab_metrics ? analysis.lab_metrics : null;
     const cwv = cwvResult.status === 'fulfilled'
       ? cwvResult.value
-      : fallbackPageSpeedMetrics();
+      : (analysisLabMetrics
+        ? {
+            ...analysisLabMetrics,
+            isAuthentic: false,
+            source: 'playwright-lab-fallback'
+          }
+        : fallbackPageSpeedMetrics());
 
     let ga4 = fallbackGa4Data();
     const warnings = [];
@@ -217,7 +259,11 @@ app.post('/analyze', ensureAuthenticated, async (req, res) => {
     }
 
     if (cwvResult.status === 'rejected') {
-      warnings.push(`PageSpeed unavailable: ${getErrorText(cwvResult.reason)}`);
+      if (analysisLabMetrics) {
+        warnings.push(`PageSpeed unavailable: ${getErrorText(cwvResult.reason)}. Using lab fallback metrics from browser run.`);
+      } else {
+        warnings.push(`PageSpeed unavailable: ${getErrorText(cwvResult.reason)}`);
+      }
     }
     if (analysisResult.status === 'rejected') {
       warnings.push('Site HTML analysis was blocked; partial report generated.');
@@ -265,4 +311,19 @@ app.post('/analyze', ensureAuthenticated, async (req, res) => {
 app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/audit', ensureAuthenticated, (_req, res) => res.sendFile(path.join(__dirname, 'public', 'audit.html')));
 
-app.listen(PORT, () => console.log(`[MERCENARY ACTIVE] Port ${PORT}`));
+process.on('SIGTERM', async () => {
+  try {
+    if (browser) await browser.close();
+  } finally {
+    process.exit(0);
+  }
+});
+
+app.listen(PORT, async () => {
+  console.log(`[MERCENARY ACTIVE] Port ${PORT}`);
+  try {
+    browser = await chromium.launch();
+  } catch (error) {
+    console.warn(`[BROWSER DISABLED] ${error.message}`);
+  }
+});

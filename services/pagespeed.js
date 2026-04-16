@@ -1,5 +1,5 @@
-const axios = require('axios');
-const { normalizeUrl } = require('../utils/url');
+const { get } = require('axios');
+const { normalizeUrl } = require('../utils/helpers');
 const { env } = require('../config/env');
 
 async function getPageSpeedMetrics(url) {
@@ -12,7 +12,7 @@ async function getPageSpeedMetrics(url) {
   let attempts = 0;
   while (attempts < 3) {
     try {
-      const response = await axios.get(psiUrl, { timeout: 30000 });
+      const response = await get(psiUrl, { timeout: 30000 });
       const result = response.data.lighthouseResult;
       const audits = result.audits;
       return {

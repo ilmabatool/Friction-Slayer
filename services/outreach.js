@@ -1,5 +1,7 @@
-const axios = require('axios');
-require('dotenv').config();
+const { get } = require('axios');
+const { config: loadDotenv } = require('dotenv');
+loadDotenv();
+const { normalizeUrl } = require('../utils/helpers');
 
 /**
  * FETCH REAL METRICS FROM GOOGLE V8 ENGINE
@@ -14,7 +16,7 @@ async function getAuthenticMetrics(url) {
   }
 
   // Ensure the URL is clean
-  const cleanUrl = url.startsWith('http') ? url : `https://${url}`;
+  const cleanUrl = normalizeUrl(url);
   const params = new URLSearchParams({
     url: cleanUrl,
     key: apiKey,
@@ -23,7 +25,7 @@ async function getAuthenticMetrics(url) {
   const psiUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?${params.toString()}`;
 
   try {
-    const response = await axios.get(psiUrl);
+    const response = await get(psiUrl);
     const audits = response.data?.lighthouseResult?.audits;
     if (!audits?.['largest-contentful-paint'] || !audits?.['interactive']) {
       throw new Error('[Google PSI] Response missing expected Lighthouse metrics.');

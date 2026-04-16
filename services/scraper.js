@@ -1,18 +1,18 @@
-const axios = require('axios');
-const cheerio = require('cheerio');
-const { normalizeUrl } = require('../utils/url');
+const { get } = require('axios');
+const { load } = require('cheerio');
+const { normalizeUrl } = require('../utils/helpers');
 
 async function analyzeHicksLaw(url) {
   try {
     const cleanUrl = normalizeUrl(url);
 
     // 5-second timeout so it doesn't hang forever
-    const { data } = await axios.get(cleanUrl, {
+    const { data } = await get(cleanUrl, {
         timeout: 5000,
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
     });
 
-    const $ = cheerio.load(data);
+    const $ = load(data);
 
     // Count navigation links and buttons (Decision points)
     const navElements = $('nav a').length || $('header a').length || $('a').length;

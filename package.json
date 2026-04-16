@@ -16,6 +16,8 @@
     "node-cron": "^4.2.1",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
+    "playwright-chromium": "^1.54.2",
+    "playwright": "^1.54.2",
     "resend": "^6.9.3"
   },
   "devDependencies": {

@@ -1124,11 +1124,29 @@
     }
 
     function updateAuthorityScore(data) {
-      const perf = Number((data.metrics || {}).performanceScore);
+      const metrics = data.metrics || {};
+      const perf = Number(metrics.performanceScore);
       const penalty = Number((data.report || {}).totalPenaltyRate);
-      let score = 50;
-      if (Number.isFinite(perf)) score = Math.round(perf);
-      if (Number.isFinite(penalty)) score = Math.max(0, Math.min(100, score - Math.round(penalty / 2)));
+
+      let score = 72;
+
+      if (Number.isFinite(perf)) {
+        score = Math.round(perf);
+      } else {
+        const lcp = Number(metrics.lcp);
+        const fcp = Number(metrics.fcp);
+        const tti = Number(metrics.tti);
+        const cls = Number(metrics.cls);
+
+        if (Number.isFinite(lcp)) score -= Math.max(0, Math.round((lcp - 2.5) * 7));
+        if (Number.isFinite(fcp)) score -= Math.max(0, Math.round((fcp - 1.8) * 5));
+        if (Number.isFinite(tti)) score -= Math.max(0, Math.round((tti - 3500) / 280));
+        if (Number.isFinite(cls)) score -= Math.max(0, Math.round(cls * 45));
+      }
+
+      if (Number.isFinite(penalty)) score -= Math.round(penalty / 2);
+      score = Math.max(0, Math.min(100, Math.round(score)));
+
       document.getElementById('authority-score').textContent = String(score);
     }
 
