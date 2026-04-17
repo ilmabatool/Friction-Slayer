@@ -116,6 +116,35 @@ function fallbackGa4Data() {
   };
 }
 
+function normalizeGa4Data(ga4Input) {
+  const fallback = fallbackGa4Data();
+  const source = ga4Input || {};
+
+  const trafficRaw = Number(source.traffic);
+  const revenueRaw = Number(source.revenue);
+  const purchasesRaw = Number(source.purchases);
+  const aovRaw = Number(source.aov);
+
+  const hasTraffic = Number.isFinite(trafficRaw) && trafficRaw > 0;
+  const hasAov = Number.isFinite(aovRaw) && aovRaw > 0;
+  const hasRevenueAndPurchases = Number.isFinite(revenueRaw) && Number.isFinite(purchasesRaw) && purchasesRaw > 0;
+
+  const inferredAov = hasRevenueAndPurchases ? +(revenueRaw / purchasesRaw).toFixed(2) : 0;
+
+  const traffic = hasTraffic ? Math.round(trafficRaw) : fallback.traffic;
+  const aov = hasAov ? +aovRaw.toFixed(2) : (inferredAov > 0 ? inferredAov : fallback.aov);
+
+  return {
+    ...source,
+    traffic,
+    aov,
+    revenue: Number.isFinite(revenueRaw) ? revenueRaw : 0,
+    purchases: Number.isFinite(purchasesRaw) ? purchasesRaw : 0,
+    hasSparseCommerceData: !hasTraffic || (!hasAov && inferredAov <= 0),
+    isFallback: !!source.isFallback || !hasTraffic || (!hasAov && inferredAov <= 0)
+  };
+}
+
 const hasGoogleOAuthConfig = Boolean(
   env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_CALLBACK_URL
 );
@@ -205,7 +234,7 @@ app.get('/api/ga4-data', ensureAuthenticated, async (req, res) => {
 
   try {
     const ga4 = await fetchGa4Data(req.user.accessToken);
-    res.json(ga4);
+    res.json(normalizeGa4Data(ga4));
   } catch (error) {
     if (error.response && error.response.status) {
       const status = error.response.status;
@@ -258,6 +287,11 @@ app.post('/analyze', ensureAuthenticated, async (req, res) => {
       warnings.push(`GA4 unavailable: ${getErrorText(ga4Error)}. Using baseline defaults.`);
     }
 
+    const ga4Model = normalizeGa4Data(ga4);
+    if (ga4Model.hasSparseCommerceData) {
+      warnings.push('GA4 returned sparse commerce values; using baseline traffic/AOV fallback for revenue modeling.');
+    }
+
     if (cwvResult.status === 'rejected') {
       if (analysisLabMetrics) {
         warnings.push(`PageSpeed unavailable: ${getErrorText(cwvResult.reason)}. Using lab fallback metrics from browser run.`);
@@ -270,8 +304,8 @@ app.post('/analyze', ensureAuthenticated, async (req, res) => {
     }
 
     const report = calculateLeak({
-      traffic: ga4.traffic,
-      aov: ga4.aov,
+      traffic: ga4Model.traffic,
+      aov: ga4Model.aov,
       lcp: cwv.lcp,
       tti: cwv.tti,
       seo: analysis.seo,
@@ -289,7 +323,7 @@ app.post('/analyze', ensureAuthenticated, async (req, res) => {
       success: true,
       url,
       metrics: cwv,
-      ga4,
+      ga4: ga4Model,
       analysis,
       chartData: analysis.chartData || null,
       report,
